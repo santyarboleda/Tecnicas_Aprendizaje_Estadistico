@@ -1,0 +1,2 @@
+# Tecnicas_Aprendizaje_Estadistico
+Técnicas de Aprendizaje Estadístico

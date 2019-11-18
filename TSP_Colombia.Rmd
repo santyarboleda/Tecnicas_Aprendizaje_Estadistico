@@ -1,0 +1,116 @@
+---
+title: "Problema del Viajero"
+author: "Santiago Arboleda"
+date: "17/11/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+Se carga el archivo con las coordenadas
+
+```{r}
+library(readxl)
+Ciudades <- read_excel("C:/Users/SSSARBOLEDA/Desktop/Unal/Semestre 1/Tecnicas de aprendizaje estadístico/Ciudades.xlsx")
+
+```
+
+
+Se importan las librerias a trabajar
+
+```{r}
+library(TSP)
+library(tspmeta)
+```
+
+Se crean el dataframe solo con las coordenadas
+
+```{r}
+coords.mx <- as.matrix(Ciudades[2:3])
+
+```
+
+Se genera la matriz de distancias
+
+```{r}
+dist.mx <- dist(coords.mx)
+```
+
+
+```{r}
+# Se construye un objeto TSP
+tsp.ins <- tsp_instance(coords.mx, dist.mx)
+tour <- run_solver(tsp.ins, method="2-opt")
+```
+
+
+Se grafican la ruta optima
+
+```{r}
+#Plot
+autoplot(tsp.ins, tour, xlab, ylab, legend = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(gmp)
+library(cluster)
+library(raster)
+
+```
+
+
+```{r}
+#Geo distance function
+
+geo.dist = function(df) {
+
+  require(geosphere)
+
+  d <- function(i,coords.mx){         # z[1:2] contain long, lat
+
+    dist <- rep(0,nrow(coords.mx))
+
+    dist[i:nrow(coords.mx)] <- distHaversine(coords.mx[i:nrow(coords.mx),1:2],coords.mx[i,1:2])
+
+    return(dist)
+
+  }
+
+  dm <- do.call(cbind,lapply(1:nrow(df),d,df))
+
+  return(as.dist(dm))
+
+}
+```
+
+
+```{r}
+df <- Ciudades
+col <- getData("GADM", country = "COL", level = 1)
+
+map.df <- fortify(col)
+```
+
+
+```{r}
+ggplot(map.df)+
+
+  geom_path(aes(x="Longitud", y="Latitud", group=group))+
+
+  geom_point(data=df, aes(x="Longitud", y="Latitud"), size=2)+
+
+
+  coord_fixed()
+```
+
+
+```{r}
+```
+

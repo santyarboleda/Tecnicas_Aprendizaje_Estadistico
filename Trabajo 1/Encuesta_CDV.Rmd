@@ -1,0 +1,153 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+En este trabajo se abordará el problema de agrupar los barrios de Medellín de acuerdo a distintas dimensiones y
+analizar espacialmente las agrupaciones.
+
+El insumo principal de este trabajo son los datos abiertos del portal Medata y en particular la Encuesta de Calidad de Vida Medellín Cómo vamos.
+
+```{r}
+ECV <- read.csv("encuesta_calidad_vida.csv", header = TRUE, sep=";")
+```
+
+1. Caracterización de las dimensiones
+
+```{r}
+summary(ECV)
+```
+
+```{r}
+sum(is.na(ECV$encuesta_calidad.p_145))
+```
+
+```{r}
+summary(ECV$encuesta_calidad.p_292)
+```
+```{r}
+ECV_ALIMENTO <- data.frame(ECV$encuesta_calidad.encuesta, ECV$encuesta_calidad.barrio, ECV$encuesta_calidad.comuna, ECV$encuesta_calidad.p_291, ECV$encuesta_calidad.p_292, ECV$encuesta_calidad.p_295)
+
+```
+
+
+```{r}
+
+names(ECV_ALIMENTO)[1] <- 'p_1'
+names(ECV_ALIMENTO)[2] <- 'encuesta'
+names(ECV_ALIMENTO)[3] <- 'persona'
+names(ECV_ALIMENTO)[4] <- 'comuna'
+names(ECV_ALIMENTO)[5] <- 'barrio'
+names(ECV_ALIMENTO)[6] <- 'p_291'
+names(ECV_ALIMENTO)[7] <- 'p_292'
+names(ECV_ALIMENTO)[8] <- 'p_295'
+
+```
+
+
+
+Dado que para las preguntas seleccionadas de alimentación, las preguntas no fueron contestados por ninguno de los encuestados del mismo hogar, se descartan esas respuestas del análisis
+
+```{r}
+ECV_ALIMENTO_DEP <- subset(ECV_ALIMENTO,ECV$encuesta_calidad.p_291 != 'NULL' & ECV$encuesta_calidad.p_292 != 'NULL' & ECV$encuesta_calidad.p_295 != 'NULL')
+```
+
+
+```{r}
+summary(ECV_ALIMENTO_DEP)
+```
+
+
+```{r}
+library(ggplot2)
+# Basic scatter plot
+ggplot(ECV_ALIMENTO_DEP, aes(x='encuesta_calidad.p_291', y='encuesta_calidad.p_292')) + geom_point()
+
+```
+
+
+```{r}
+# Change the point size, and shape
+ggplot(ECV_ALIMENTO_DEP, aes(x='encuesta_calidad.p_291', y='encuesta_calidad.p_295')) +
+  geom_point(size=2, shape=23)
+```
+NOTA:
+Cuando las preguntas hacen referencia al hogar, tomaremos la moda a nivel de encuesta
+
+```{r}
+library(plyr)
+(summ <- ddply(ECV_ALIMENTO_DEP, .('encuesta_calidad.barrio'), summarize, Sum_Allow=sum(ECV_ALIMENTO_DEP$'encuesta_calidad.p_291')))
+```
+
+
+```{r}
+unique('ECV_ALIMENTO_DEP$encuesta_calidad.p_291')
+```
+
+
+```{r}
+x <- c(0, 0, 1)
+mode(x)
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+

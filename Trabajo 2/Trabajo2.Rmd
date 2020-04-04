@@ -1,0 +1,1665 @@
+---
+title: "Segundo Trabajo - Técnicas de Aprendizaje Estadístico"
+author: "Santiago Arboleda"
+date: "10/3/2020"
+output: 
+  html_document:
+    theme: cerulean
+    highlight: textmate
+    css: styles.css
+---
+
+**Del texto guía llevar a cabo los ejercicios 4.7.2 del 10 al 13; 8.4 del 7 al 12 y 9.7.2 del 4 al 8. Se deben presentar en un documento 
+de RMarkdown con un estilo CSS personalizado**
+
+
+[- Sección 4.7](#sección-4.7)
+
+
+[  * Ejercicio 10](#ejercicio-10)
+[  * Ejercicio 11](#ejercicio-11)
+[  * Ejercicio 12](#ejercicio-12)
+[  * Ejercicio 13](#ejercicio-13)
+
+
+[- Sección 8.4](#sección-8.4)
+
+[  * Ejercicio 7](#ejercicio-7)
+[  * Ejercicio 8](#ejercicio-8)
+[  * Ejercicio 9](#ejercicio-9)
+[  * Ejercicio 10](#ejercicio-10-1)
+[  * Ejercicio 11](#ejercicio-11-1)
+[  * Ejercicio 12](#ejercicio-12-1)
+
+
+[- Sección 9.7](#sección-9.7)
+
+[  * Ejercicio 4](#ejercicio-4)
+[  * Ejercicio 5](#ejercicio-5)
+[  * Ejercicio 6](#ejercicio-6)
+[  * Ejercicio 7](#ejercicio-7-1)
+[  * Ejercicio 8](#ejercicio-8-1)
+
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+
+
+```{r, warning=FALSE,message=FALSE}
+# Importamos las librerías a utilizar
+library(ISLR)
+library(akima)
+library(GGally) 
+require(ggplot2)
+require(lattice)
+library(psych)
+library(caret)
+library(e1071)
+library(MASS)
+library(class)
+library(ISLR)
+library(tree)
+library(randomForest)
+library(gbm)
+library(glmnet)
+```
+
+
+
+# Sección 4.7 
+
+
+## Ejercicio 10
+
+Esta pregunta debe responderse utilizando el conjunto de datos Weekly, que es parte del paquete ISLR. Estos datos son de naturaleza similar a los datos de Smarket del laboratorio de este capítulo, excepto que contiene 1, 089 devoluciones semanales durante 21 años, desde principios de 1990 hasta finales de 2010.
+
+Se lee el dataset
+
+```{r}
+data <- Weekly
+head(data)
+```
+
+**a) Produzca algunos resúmenes numéricos y gráficos de los datos semanales. ¿Parece haber algún patrón?**
+
+Revisamos algunas estadísticas del dataset
+
+```{r}
+summary(data)
+```
+
+Generamos un pairplot y revisamos si hay alguna relación entre las variables
+
+```{r}
+pairs.panels(data, 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+
+
+
+```
+
+Entre la variable Year y Volume aparentemente hay una relación lineal, graficamos los puntos y una linea de regresión
+
+```{r}
+plot(Volume~Year, col="darkred", data=data)
+simplelm = lm(Volume~Year, data=data)
+abline(simplelm, lwd= 3, col= "darkgreen")
+```
+
+**b) Utilice el conjunto de datos completo para realizar una regresión logística con Direction como respuesta y las cinco variables lag más el Volumen como predictores. Use la función de resumen para imprimir los resultados. ¿Alguno de los predictores parece ser estadísticamente significativo? ¿De ser asi, cuales?**
+
+Generamos una Regresión logística
+
+```{r}
+logmod <- glm(Direction~Lag1+Lag2+Lag3+Lag4+Lag5+Volume,family = "binomial", data=Weekly)
+summary(logmod)
+```
+
+De los 6 predictores, solo Lag2 parece ser estadísticamente significativo para predecir la Dirección. El coeficiente estimado es de 0.058, lo que significaría que un aumento de 1 en Lag2 representa un aumento de e ^ 0.058 = 1,06 en las probabilidades de que la dirección suba.
+
+
+**c) Calcule la matriz de confusión y la fracción general de las predicciones correctas. Explique qué le dice la matriz de confusión sobre los tipos de errores cometidos por la regresión logística.**
+
+
+Hacemos las predicciones y revisamos la matriz de confusión
+
+```{r}
+prob <- predict(logmod, type="response")
+preds <- rep("Down", 1089)
+preds[prob > 0.5] = "Up"
+predicciones_entrena <- as.factor(preds)
+observaciones_entrena <- as.factor(data$Direction)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Revisamos las métricas
+
+```{r}
+matriz$byClass
+```
+
+Podemos ver que hay un predominio del clasificador por la clase Up, dado que la clase Down la predice bien en un 11% mientras que la clase Up lo hace bien en el 92% de las veces.
+
+
+**d) Ahora ajuste el modelo de regresión logística utilizando un período de datos de entrenamiento de 1990 a 2008, con Lag2 como el único predictor. Calcule la matriz de confusión y la fracción general de las predicciones correctas para los datos retenidos (es decir, los datos de 2009 y 2010)**
+
+Generamos el modelo
+
+```{r}
+train <- data[data$Year<2009,]
+test <- data[data$Year>2008,]
+reg_log <- glm(Direction~Lag2, data= train, family = "binomial")
+summary(reg_log)
+```
+
+Revisamos el tamaño del set de pruebas
+
+```{r}
+dim(test)
+```
+
+
+```{r}
+pred <- predict(reg_log, type="response", newdata = test)
+pred_var <- rep("Down",104)
+pred_var[pred>.5] <- "Up"
+```
+
+Hacemos las predicciones y revisamos la matriz de confusión
+
+```{r}
+predicciones_entrena <- as.factor(pred_var)
+observaciones_entrena <- as.factor(test$Direction)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Revisamos las métricas
+
+```{r}
+matriz$byClass
+```
+
+
+Vemos que el rendimiento de la regresión es del 63.25%, sin embargo, vemos de nuevo que lo hace de buena manera para la clase Up, pero para la clase Down lo hace bien el 21% de las veces.
+
+
+**e) Repita (d) usando LDA**
+
+Creamos un modelo LDA, hacemos las predicciones y revisamos la matriz de confusión
+
+```{r}
+lda <- lda(Direction~Lag2, data = train)
+lda_pred <- predict(lda, newdata = test)
+matriz <- confusionMatrix(test$Direction, lda_pred$class)
+matriz
+```
+
+Revisamos las métricas
+
+```{r}
+matriz$byClass
+```
+
+
+Vemos que el resultado no tiene un cambio frente al resultado del literal d con regresión logística
+
+
+**f) Repita (d) usando QDA**
+
+Generamos un modelo con QDA, hacemos las predicciones y revisamos la matriz de confusión 
+
+```{r}
+qda <- qda(Direction ~ Lag2, data=train)
+qda_pred <- predict(qda, newdata=test)
+matriz <- confusionMatrix(test$Direction, qda_pred$class)
+matriz
+```
+
+Podemos ver que el accuracy es inferior a los modelos probados anteriormente, logrando un 58.65%. Clasifico todos los ejemplos en la clase "Up"
+
+
+**g) Repita (d) usando KNN con K = 1**
+
+Creamos un modelo con KNN con k=1, hacemos las predicciones y revisamos la matriz de confusión
+
+```{r}
+set.seed(42)
+train_X <- cbind(train$Lag2)
+test_X <- cbind(test$Lag2)
+train_Y <- cbind(train$Direction)
+test_Y <- cbind(test$Direction)
+knn_pred <- knn(train_X, test_X, train_Y, k=1)
+predicciones_entrena <- as.factor(knn_pred)
+observaciones_entrena <- as.factor(test_Y)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Revisamos las métricas
+
+```{r}
+matriz$byClass
+```
+
+Se observa un accuracy cercano alrededor el 50%, infeior a los vistos en los métodos anteriores.
+
+
+**h) ¿Cuál de estos métodos parece proporcionar los mejores resultados con estos datos?**
+
+R: Regresión logística y LDA parecen proporcionar los mejores resultados para el set de datos.
+
+
+
+**i) Experimente con diferentes combinaciones de predictores, incluidas posibles transformaciones e interacciones, para cada uno de los métodos. Informe las variables, el método y la matriz de confusión asociada que parece proporcionar los mejores resultados en los datos retenidos. Tenga en cuenta que también debe experimentar con los valores de K en el clasificador KNN.**
+
+Modelo LDA, preddionces y su matriz de confusión
+
+```{r}
+lda_2 = lda(Direction~Lag1 + Lag3 + Lag5, data= train)
+lda2_pred <- predict(lda_2, newdata=test)
+matriz_lda2 <- confusionMatrix(test$Direction, lda2_pred$class)
+matriz_lda2
+```
+
+Modelo QDA, predicciones y su matriz de confusión
+
+```{r}
+qda_2 = qda(Direction~Lag1 + Lag3 + Lag5, data= train)
+qda2_pred <- predict(qda_2, newdata=test)
+matriz_qda2 <- confusionMatrix(test$Direction, qda2_pred$class)
+matriz_qda2
+```
+
+Modelo KNN, con K = 5, predicciones y su matriz de confusión
+
+```{r}
+set.seed(42)
+train_X <- cbind(train$Lag4)
+test_X <- cbind(test$Lag4)
+train_Y <- cbind(train$Direction)
+test_Y <- cbind(test$Direction)
+knn_pred_5 <- knn(train_X, test_X, train_Y, k=5)
+predicciones_entrena <- as.factor(knn_pred_5)
+observaciones_entrena <- as.factor(test_Y)
+matriz_knn5 <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz_knn5
+```
+
+
+En los 3 casos, los clasificadores no son mejores que los vistos (Regresión Logística y LDA) con Lag2 como variable predictora.
+
+
+## Ejercicio 11
+
+En este problema, desarrollará un modelo para predecir si un automóvil determinado obtiene un consumo de combustible alto o bajo en función del conjunto de datos Auto
+
+
+**a) Cree una variable binaria, mpg01, que contenga un 1 si mpg contiene un valor por encima de su mediana, y un 0 si mpg contiene un valor por debajo de su mediana. Puede calcular la mediana utilizando la función mediana (). Tenga en cuenta que puede resultarle útil utilizar la función data.frame () para crear un único conjunto de datos que contenga tanto mpg01 como las otras variables automáticas**
+
+```{r}
+autos <- Auto
+attach(autos)
+```
+
+
+```{r}
+autos$mpg01 <- rep(0, length(autos$mpg))
+autos$mpg01[mpg>median(mpg)] <- 1
+```
+
+
+**b) Explore los datos gráficamente para investigar la asociación entre mpg01 y las otras características. ¿Cuál de las otras características parece más útil para predecir mpg01? Los diagramas de dispersión y los diagramas de caja pueden ser herramientas útiles para responder esta pregunta. Describe tus hallazgos.**
+
+Generamos un pairplot y revisamos si hay alguna relación entre las variables y mpg01
+
+```{r}
+pairs.panels(autos, 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+```
+
+Al revisar los coeficientes de correlación, vemos que aparentemente existe una relación lineal para variables como "Caballos de fuerza", "Cilindros", "Desplazamiento" y "Peso". Revisemos un gráfico de dispersión de estas variables:
+
+
+```{r}
+par(mfrow=c(2,2))
+plot(autos$year, autos$cylinders, col= ifelse(autos$mpg01==0, "darkorange", "black"), pch = 6)
+plot(autos$year, autos$weight, col= ifelse(autos$mpg01==0, "darkorange", "black"), pch = 6)
+plot(autos$year, autos$horsepower, col= ifelse(autos$mpg01==0, "darkorange", "black"), pch = 6)
+plot(autos$year, autos$displacement, col= ifelse(autos$mpg01==0, "darkorange", "black"), pch = 6)
+```
+
+Los graficos de dispersión nos indican que son variables que parecen dividir de buena manera los datos etiquetados en la variable mpg01.
+
+
+**c) Divida los datos en un conjunto de entrenamiento y un conjunto de prueba.**
+
+```{r}
+set.seed(42)
+seleccion = sample(x=nrow(autos), size=.8*nrow(autos))
+train = autos[seleccion, ]
+test = autos[-seleccion, ]
+```
+
+
+**d) Realice LDA en los datos de entrenamiento para predecir mpg01 usando las variables que parecían más asociadas con mpg01 en (b). ¿Cuál es el error de prueba del modelo obtenido?**
+
+Creamos el modelo, generamos las predicciones y revisamos su matriz de confusión
+
+```{r}
+lda <- lda(mpg01~displacement+weight+cylinders+horsepower+year, data=train)
+lda_pred <- predict(lda, newdata = test)
+predicciones_entrena <- as.factor(lda_pred$class)
+observaciones_entrena <- as.factor(test$mpg01)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+
+```
+
+Revisamos las métricas
+
+```{r}
+matriz$byClass
+```
+
+Podemos observar que el rendimiento del modelo es muy bueno a nivel general y a nivel de clases, teniendo un accuracy del 95% y una tasa de error del 5.31%.
+
+
+**e) Realice QDA en los datos de entrenamiento para predecir mpg01 usando las variables que parecían más asociadas con mpg01 en (b). ¿Cuál es el error de prueba del modelo obtenido?**
+
+Creamos el modelo, generamos las predicciones y revisamos su matriz de confusión
+
+```{r}
+qda <- qda(mpg01~displacement+weight+cylinders+horsepower+year, data=train)
+qda_pred <- predict(qda, newdata = test)
+predicciones_entrena <- as.factor(qda_pred$class)
+observaciones_entrena <- as.factor(test$mpg01)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Revisamos las métricas 
+
+```{r}
+matriz$byClass
+```
+
+El desempeño del modelo es un poco menos al encontrado con LDA, sin embargo sigue siendo bueno, con un accuracy del 92% y un error del 7.97%.
+
+**f) Realice una regresión logística en los datos de entrenamiento para predecir mpg01 utilizando las variables que parecían más asociadas con mpg01 en (b). ¿Cuál es el error de prueba del modelo obtenido?**
+
+Creamos el modelo, generamos las predicciones y revisamos su matriz de confusión
+
+```{r}
+log_reg <- glm(mpg01~displacement+weight+cylinders+horsepower+year, family="binomial", data=train)
+log_reg_prob <- predict(log_reg, test, type="response")
+log_reg_pred <- ifelse(log_reg_prob>0.5, "1", "0")
+predicciones_entrena <- as.factor(log_reg_pred)
+observaciones_entrena <- as.factor(test$mpg01)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Revisamos las métricas
+
+```{r}
+matriz$byClass
+```
+
+Revisando el clasificador con al regresión logística, vemos un buen rendimiento con accuracy del 91% con un error del 9.50%, sin embargo es menos a los método vistos anteriormente.
+
+Creamos el modelo y revisamos su matriz de confusión
+
+**g) Realice KNN en los datos de entrenamiento, con varios valores de K, para predecir mpg01. Use solo las variables que parecían estar más asociadas con mpg01 en (b). ¿Qué errores de prueba obtienes? ¿Qué valor de K parece tener el mejor rendimiento en este conjunto de datos?**
+
+Creamos el modelo, generamos las predicciones y revisamos su matriz de confusión
+
+```{r}
+set.seed(42)
+train_X2 <- cbind(train$displacement, train$weight, train$cylinders, train$horsepower, train$year)
+test_X2 <- cbind(test$displacement, test$weight, test$cylinders, test$horsepower, test$year)
+train_Y2 <- cbind(train$mpg01)
+knn_pred2_3 <- knn(train_X2, test_X2, train_Y2, k=3)
+predicciones_entrena <- as.factor(knn_pred2_3)
+observaciones_entrena <- as.factor(test$mpg01)
+matriz_knn3 <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+tasa_error_k3 <- round((sum(matriz_knn3$table[1,2], matriz_knn3$table[2,1])/dim(test)[1])*100, 2)
+matriz_knn3
+paste("La tasa de error es de: ", tasa_error_k3, "%")
+```
+
+Creamos el modelo, generamos las predicciones y revisamos su matriz de confusión
+
+```{r}
+set.seed(42)
+train_X2 <- cbind(train$displacement, train$weight, train$cylinders, train$horsepower, train$year)
+test_X2 <- cbind(test$displacement, test$weight, test$cylinders, test$horsepower, test$year)
+train_Y2 <- cbind(train$mpg01)
+knn_pred2_5 <- knn(train_X2, test_X2, train_Y2, k=5)
+predicciones_entrena <- as.factor(knn_pred2_5)
+observaciones_entrena <- as.factor(test$mpg01)
+matriz_knn5 <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+tasa_error_k5 <- round((sum(matriz_knn5$table[1,2], matriz_knn5$table[2,1])/dim(test)[1])*100, 2)
+matriz_knn5
+paste("La tasa de error es de: ", tasa_error_k5, "%")
+```
+
+Creamos el modelo, generamos las predicciones y revisamos su matriz de confusión
+
+```{r}
+set.seed(42)
+train_X2 <- cbind(train$displacement, train$weight, train$cylinders, train$horsepower, train$year)
+test_X2 <- cbind(test$displacement, test$weight, test$cylinders, test$horsepower, test$year)
+train_Y2 <- cbind(train$mpg01)
+knn_pred2_9 <- knn(train_X2, test_X2, train_Y2, k=9)
+predicciones_entrena <- as.factor(knn_pred2_9)
+observaciones_entrena <- as.factor(test$mpg01)
+matriz_knn9 <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+tasa_error_k9 <- round((sum(matriz_knn9$table[1,2], matriz_knn9$table[2,1])/dim(test)[1])*100, 2)
+paste("La tasa de error es de: ", tasa_error_k9, "%")
+```
+
+Encontramos que K = 3 nos permite tener el mejor desempeño.
+
+
+## Ejercicio 12
+
+Este problema implica funciones de escritura.
+
+**a) Escriba una función, Potencia (), que imprima el resultado de elevar 2 a la tercera potencia. En otras palabras, su función debe calcular 2 ^ 3 e imprimir los resultados. Sugerencia: recuerde que x ^ a eleva x a la potencia a. Use la función print () para generar el resultado.**
+
+```{r  include = TRUE}
+knitr::opts_chunk$set(echo=TRUE)
+```
+
+```{r}
+potencia <- function (){
+  print(2^3)}
+potencia()
+```
+
+**b) Cree una nueva función, Power2 (), que le permita pasar dos números, x y a, e imprima el valor de x ^ a. Puede hacer esto comenzando su función con la línea**
+
+```{r}
+potencia2 <- function (x,a){
+  print(x^a)
+}
+potencia2(2,3)
+```
+
+**c) Usando la función Potencia2() que acaba de escribir, calcule 10^3, 8^17 y 131^3.**
+
+```{r}
+potencia2(10,3)
+potencia2(8,17)
+potencia2(131,3)
+```
+
+**d) Ahora cree una nueva función, Potencia3(), que realmente devuelve el resultado x ^ a como un objeto R, en lugar de simplemente imprimirlo en la pantalla. Es decir, si almacena el valor x ^ a en un objeto llamado resultado dentro de su función, simplemente puede devolver () este resultado.**
+
+```{r}
+potencia3 <- function(x,a){
+  return(x^a)
+}
+potencia3(2,3)
+```
+
+**e) Ahora, usando la función Potencia3(), cree una gráfica de f (x) = x2. El eje x debería mostrar un rango de enteros de 1 a 10, y el eje y debería mostrar x2. Rotule los ejes apropiadamente y use un título apropiado para la figura. Considere mostrar el eje x, el eje y o ambos en la escala logarítmica. Puede hacerlo utilizando log = '' x '', log = '' y '' o log = '' xy '' como argumentos para la función plot ().**
+
+```{r}
+x <- c(1:10)
+y <- potencia3(x,2)
+plot(x,y,log="x", xlab="log(x) scale", ylab="x²", main="Gráfico de la funcion f(x) = x²")
+```
+
+**f) Cree una función, PlotPotencia(), que le permite crear una gráfica de x contra x ^ a para un a fijo y para un rango de valores de x. Por ejemplo, si llama, se debe crear un diagrama con un eje x que tome los valores 1,2, ..., 10 y un eje y que tome los valores 13,23, ..., 103.**
+
+```{r}
+plotPotencia <- function(x,a){
+  return(plot(x=x,y=x^a))
+}
+
+plotPotencia(1:100,3)
+```
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+## Ejercicio 13 
+
+**Utilizando el conjunto de datos de Boston, ajuste los modelos de clasificación para predecir si un suburbio dado tiene una tasa de criminalidad superior o inferior a la mediana. Explore los modelos de regresión logística, LDA y KNN utilizando varios subconjuntos de predictores. Describe tus hallazgos.**
+
+Se lee el set de datos y vemos un resumen de las columnas
+
+```{r}
+boston <- Boston
+boston$crim01 <- ifelse(boston$crim>median(boston$crim),1,0)
+#attach(Boston)
+summary(boston)
+```
+
+Generamos un pairplot y revisamos si hay alguna relación entre las variables y crim01
+
+```{r}
+pairs.panels(boston, 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+```
+
+De acuerdo al gráfico anterior, seleccionamos las variables que cuyo coeficiente de correlación indica posiblemente una relación lineal. Preparamos el set de datos de entrenamiento y de pruebas:
+
+```{r}
+variables = c("zn", "indus", "nox", "age", "dis", "rad", "tax", "ptratio", "black", "lstat", "medv", "crim01")
+filas = sample(x=nrow(boston), size=.8*nrow(boston))
+train = boston[filas, variables]
+test = boston[-filas, variables]
+```
+
+
+Creamos un modelo LDA y verificamos el error de predicción
+
+```{r}
+lda <- lda(crim01 ~ ., data=train)
+lda_pred <- predict(lda, test)
+lda_error <- mean(lda_pred$class!=test$crim01)
+lda_error*100
+```
+
+Creamos un modelo QDA y verificamos el error de predicción
+
+```{r}
+qda<- qda(crim01 ~ ., data=train)
+qda_pred <- predict(qda, test)
+qda_error <- mean(qda_pred$class!=test$crim01)
+qda_error*100
+```
+
+Creamos un modelo de Regresión Logística y verificamos el error de predicción
+
+```{r}
+log_reg <- glm(as.factor(crim01) ~ ., data=train, family="binomial")
+log_reg_prob <- predict(log_reg, test, type="response")
+log_reg_pred <- ifelse(log_reg_prob>.5, "1","0")
+log_reg_error <- mean(log_reg_pred!=test$crim01)
+log_reg_error*100
+```
+
+Creamos un modelo KNN y verificamos el error de predicción
+
+```{r}
+knn_pred <- knn(train=train, test=test, cl=train$crim01, k=3)
+knn_error <- mean(knn_pred!=test$crim01)
+knn_error*100
+```
+
+El modelo que menor error arroja para el set de datos es Regresión Logística.
+
+
+
+# Sección 8.4 
+
+## Ejercicio 7
+
+**En el laboratorio, aplicamos bosques aleatorios a los datos de Boston usando mtry = 6 y usando ntree = 25 y ntree = 500. Cree un gráfico que muestre el error de prueba resultante de bosques aleatorios en este conjunto de datos para obtener una gama más completa de valores para mtry y ntree. Puede modelar su diagrama después de la Figura 8.10. Describa los resultados obtenidos.**
+
+
+- Dividimos el conjunto de datos
+
+```{r}
+set.seed(42)
+subset<-sample(1:nrow(Boston),nrow(Boston)*.7)
+Boston_train<-Boston[subset,-14]
+Boston_test<-Boston[-subset,-14]
+y_train<-Boston[subset,14]
+y_test<-Boston[-subset,14]
+```
+
+
+- Se entrenan 3 modelos con m=p,p/2 y p/3
+
+```{r}
+rf_model1 <- randomForest(Boston_train,y=y_train,xtest = Boston_test,ytest = y_test,ntree=500,mtry=ncol(Boston_train))
+rf_model2 <- randomForest(Boston_train,y=y_train,xtest = Boston_test,ytest = y_test,ntree=500,mtry=ncol(Boston_train)/2)
+rf_model3 <- randomForest(Boston_train,y=y_train,xtest = Boston_test,ytest = y_test,ntree=500,mtry=ncol(Boston_train)/3)
+```
+
+- Graficamos la tasa de error de cada modelo
+
+```{r}
+plot(1:500,rf_model1$test$mse,col="red",type="l",xlab = "Número de Árboles",ylab = "Tasa de Error",ylim = c(10,25), main="Tasa de Error Vs. Número de Arboles")
+lines(1:500,rf_model2$test$mse, col="orange",type="l")
+lines(1:500,rf_model3$test$mse, col="green",type="l")
+legend("topright",c("m=p","m=p/2","m=p/3"),col=c("red","orange","green","blue","black"),cex=0.5,lty=1)
+```
+
+Podemos concluir que la tasa de error tiende a disminuir con mas árboles. Al final, vemos que el menos valor del error lo encontramos con m = p/3. 
+
+## Ejercicio 8
+
+**En el laboratorio, se aplicó un árbol de clasificación al conjunto de datos "Carseats" después de convertir "Ventas" en una variable de respuesta cualitativa. Ahora buscaremos predecir "Ventas" utilizando árboles de regresión y enfoques relacionados, tratando la respuesta como una variable cuantitativa.**
+
+**a) Divida el conjunto de datos en un conjunto de entrenamiento y un conjunto de prueba.**
+
+```{r}
+set.seed(42)
+train <- sample(nrow(Carseats),nrow(Carseats)*.7)
+Carseats_train <- Carseats[train, ]
+Carseats_test <- Carseats[-train, ]
+```
+
+**b) Ajuste un árbol de regresión al conjunto de entrenamiento. Trace el árbol e interprete los resultados. ¿Qué tasa de error de prueba obtienes?**
+
+Creamos el modelo, hacaemos las predicciones, y revisamos el error y el gráfico que representa el modelo
+
+```{r}
+tree_car<- tree(Sales ~ ., data = Carseats_train)
+summary(tree_car)
+plot(tree_car)
+text(tree_car, pretty = 0)
+yhat <- predict(tree_car, newdata = Carseats_test)
+mean((yhat - Carseats_test$Sales)^2)
+```
+
+Vemos un resumen del modelo
+
+```{r}
+summary(tree_car)
+```
+
+Analizamos el error arrojado por el modelo
+
+```{r}
+tree_pred <- predict(tree_car,newdata=Carseats_test)
+tree_mse<-mean((Carseats_test$Sales-tree_pred)^2)
+tree_mse
+```
+
+Podemos ver que el arbol tiene 21 nodos terminales, ademas una tasa de error de entrenamiento de 3.90%
+
+
+**c) Utilice la validación cruzada para determinar el nivel óptimo de complejidad del árbol. ¿La poda del árbol mejora la tasa de error de prueba?**
+
+Graficamos las desviación de la validación cruzada
+
+```{r}
+cv_carseats <- cv.tree(tree_car)
+plot(cv_carseats$size, cv_carseats$dev, type = "b")
+tree_min <- which.min(cv_carseats$dev)
+points(tree_min, cv_carseats$dev[tree_min], col = "red", cex = 2, pch = 20)
+```
+
+Revisamos el comportamiento en cada nodo
+
+```{r}
+tree_car
+```
+
+
+En este caso, el tamaño del árbol selecionado es 13 por validación cruzada, ahora podamos el árbol para obtener un árbol de 13 nodos finales
+
+Entranamos y predecimos el árbol generado con el parámetro de poda
+
+```{r}
+prune_carseats <- prune.tree(tree_car, best = 13)
+plot(prune_carseats)
+text(prune_carseats, pretty = 0)
+yhat <- predict(prune_carseats, newdata = Carseats_test)
+mean((yhat - Carseats_test$Sales)^2)
+```
+
+Revisamos el error arrojado por el árbol
+
+```{r}
+prune_pred <- predict(prune_carseats,Carseats_test)
+mean((prune_pred-Carseats_test$Sales)^2)
+```
+
+Observamos que la poda mejoro la tasa de error con un 4.02%, sin embargo no es un cambio muy significativo.
+
+
+**d) Utilice el enfoque de bagging para analizar estos datos. ¿Qué tasa de error de prueba obtienes? Use la función "importancia ()" para determinar qué variables son más importantes.**
+
+Entrenamos el modelo y revisamos la tasa de error
+
+```{r}
+bag_carseats <- randomForest(Sales ~ ., data = Carseats_train, mtry = 10, ntree = 500, importance = TRUE)
+bag_pred <- predict(bag_carseats, newdata = Carseats_test)
+mean((bag_pred - Carseats_test$Sales)^2)
+```
+
+Podemos observar que la tasa de error disminuyó a 2.01%
+
+Buscamos las características mas importantes del modelo
+
+```{r}
+importance(bag_carseats)
+```
+
+Las características mas importantes son: "Price" y "ShelveLoc"
+
+
+**e) Utilice bosques aleatorios para analizar estos datos. ¿Qué tasa de error de prueba obtienes? Use la función "importancia ()" para determinar qué variables son más importantes. Describa el efecto de $ m $, el número de variables consideradas en cada división, sobre la tasa de error obtenida.**
+
+Entrenamos el modelo y revisamos la tasa de error
+
+```{r}
+rf_carseats <- randomForest(Sales ~ ., data = Carseats_train, mtry = 3, ntree = 500, importance = TRUE)
+rf_pred <- predict(rf_carseats, newdata = Carseats_test)
+mean((rf_pred - Carseats_test$Sales)^2)
+```
+
+En este caso, con 500 árboles tenemos una tasa de error del 2.71%.
+
+Revisamos las características mas importantes
+
+```{r}
+importance(rf_carseats)
+```
+
+Concluímos de nuevo que las variables mas importantes son "Price" y "ShelveLoc"
+
+
+## Ejercicio 9
+
+**Este problema involucra el conjunto de datos "OJ" que es parte del paquete "ISLR".**
+
+**a) Cree un conjunto de entrenamiento que contenga una muestra aleatoria de 800 observaciones, y un conjunto de prueba que contenga las observaciones restantes.**
+
+- Creamos el conjunto de datos
+
+```{r}
+set.seed (42)
+tren <- sample(1:nrow(OJ),800)
+train_oj <- OJ[tren,]
+test_oj <- OJ[-train,]
+```
+
+
+**b) Ajuste un árbol a los datos de entrenamiento, con Compra como respuesta y las otras variables como predictores. Use la función summary () para generar estadísticas resumidas sobre el árbol y describa los resultados obtenidos. ¿Cuál es la tasa de error de entrenamiento? ¿Cuántos nodos terminales tiene el árbol?**
+
+Creamos el modelos y vemos un resumen del mismo
+
+```{r}
+tree_oj <- tree(Purchase~.,train_oj)
+resumen <- summary(tree_oj)
+resumen
+```
+
+Revisamos el error encontrado
+
+```{r}
+tree_oj_error <- resumen$misclass[1]*100/resumen$misclass[2]
+tree_oj_error
+```
+
+El algoritmo eligió  las variables: "LoyalCH", "SalePriceMM" y "PriceDiff", y se encontró un error del 16.38% con 8 nodos terminales. 
+
+
+**c) Escriba el nombre del objeto del árbol para obtener una salida de texto detallada. Elija uno de los nodos terminales e interprete la información que se muestra.**
+
+Vemos el comportamiento del modelo en cada uno de los nodos
+
+```{r}
+tree_oj
+```
+
+
+Para explicar, se selecciona el nodo 13: "PriceDiff", el cual es nodo terminal. El nodo se divide para PriceDiff > 0.265, podemos ver que hay 81 observaciones en esta hoja con una desviación de 47.66 y con una predicción general de CH del 91% y un 8.6% restante para MM.
+
+
+**d) Cree un diagrama del árbol e interprete los resultados.**
+
+```{r}
+plot(tree_oj)
+text(tree_oj,pretty=0)
+```
+
+
+Podemos ver que el indicador más importante de "Compra" parece ser "LoyalCH", ya que la primera sucursal diferencia la intensidad de la lealtad de la marca del cliente a CH. De hecho, los tres primeros nodos contienen "LoyalCH". 
+
+
+**e) Predecir la respuesta en los datos de prueba, y producir una matriz de confusión comparando las etiquetas de prueba con las etiquetas de prueba predichas. ¿Cuál es la tasa de error de prueba?**
+
+Predecimos con la data de prueba y revisamos la matriz de confusión
+
+```{r}
+tree_pred <- predict(tree_oj,newdata = test_oj,type = "class")
+predicciones_entrena <- as.factor(tree_pred)
+observaciones_entrena <- as.factor(test_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+
+La tasa de error es de la prueba es del 18.23%
+
+
+**f) Aplique la función "cv.tree ()" al conjunto de entrenamiento para determinar el árbol de tamaño óptimo.**
+
+Entrenamos con cross-validation
+
+```{r}
+train_oj_cv <- cv.tree(tree_oj,FUN = prune.misclass)
+train_oj_cv
+```
+
+
+**g) Produzca un diagrama con el tamaño del árbol en el eje $ x $ y la tasa de error de clasificación con validación cruzada en el eje $ y $.**
+
+```{r}
+plot(train_oj_cv$size,train_oj_cv$dev,xlab="Tamaño del Árbol",ylab="Desviación CV",type = "b")
+points(5,min(train_oj_cv$dev),col="red")
+```
+
+
+**h) ¿Qué tamaño de árbol corresponde a la tasa de error de clasificación con validación cruzada más baja?**
+
+Vemos que la desviación es mínima en los datos validados cruzados para el árbol de tamaño 5 u 8.
+
+
+**i) Produzca un árbol podado correspondiente al tamaño óptimo del árbol obtenido mediante validación cruzada. Si la validación cruzada no conduce a la selección de un árbol podado, cree un árbol podado con cinco nodos terminales.**
+
+Graficamos el árbol generado despues de la poda
+
+```{r}
+prune_oj <- prune.misclass(tree_oj,best=5)
+plot(prune_oj)
+text(prune_oj,pretty=0)
+```
+
+**j) Compare las tasas de error de entrenamiento entre los árboles podados y no podados. ¿Cuál es más alto?**
+
+Revisamos el error encontrado con la poda
+
+```{r}
+resumen_oj <- summary(prune_oj)
+prune_misclas <- resumen_oj$misclass[1]*100/resumen_oj$misclass[2]
+prune_misclas
+```
+
+La tasa de error de clasificación es menor para el árbol podado, observando 16.38% frente a 18.23% *
+
+
+**k) Compare las tasas de error de prueba entre los árboles podados y no podados. ¿Cuál es más alto?**
+
+Probamos el árbol podado con los datos de prueba y revisamos la matriz de confusión
+
+```{r}
+prune_test_pred <- predict(prune_oj,newdata = test_oj,type="class")
+predicciones_entrena <- as.factor(prune_test_pred)
+observaciones_entrena <- as.factor(test_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Encontramos que después de la poda, la tasa de clasificación errónea en los datos de prueba es igual en comparación con el árbol adulto. Esto significa que no hubo significativo en el desempeño del modelo después de la poda. 
+
+
+## Ejercicio 10
+
+**Ahora usamos boosting para predecir el salario en el conjunto de datos de Hitters.**
+
+
+**a) Elimine las observaciones para las que se desconoce la información salarial, y luego transforme logarítmicamente los salarios.**
+ 
+Leemos el conjunto de datos y lo depuramos 
+ 
+```{r}
+#attach(Hitters)
+Hitters <- na.omit(Hitters)
+Hitters$Salary <- log(Hitters$Salary)
+```
+
+
+**b) Cree un conjunto de entrenamiento que consista en las primeras 200 observaciones, y un conjunto de prueba que consista en las observaciones restantes.**
+
+Separamos el conjunto de datos
+
+```{r}
+subset<-1:200
+hitters_train<-Hitters[subset,]
+hitters_test<-Hitters[-subset,]
+```
+
+
+**c)Realice el boosting en el conjunto de entrenamiento con 1,000 árboles para un rango de valores del parámetro de contracción ??. Produzca un gráfico con diferentes valores de contracción en el eje xy el conjunto de entrenamiento MSE correspondiente en el eje y.**
+
+Graficamos los errores de entrenamiento versus los valores de lambda
+
+```{r}
+set.seed(42)
+pows <- seq(-10, -0.2, by = 0.1)
+lambdas <- 10^pows
+train_error <- rep(NA, length(lambdas))
+for (i in 1:length(lambdas)) {
+    boost_hitters <- gbm(Salary ~ ., data = hitters_train, distribution = "gaussian", n.trees = 1000, shrinkage = lambdas[i])
+    pred_train <- predict(boost_hitters, hitters_train, n.trees = 1000)
+    train_error[i] <- mean((pred_train - hitters_train$Salary)^2)
+}
+plot(lambdas, train_error, type = "b", xlab = "Valores de Disminución (lambda)", ylab = "Error de entrenamiento")
+```
+
+**d) Produzca un gráfico con diferentes valores de contracción en el eje x y el conjunto de pruebas MSE correspondiente en el eje $ y $.**
+
+Graficamos los errores de prueba versus los valores de lambda
+
+```{r}
+set.seed(42)
+test_error <- rep(NA, length(lambdas))
+for (i in 1:length(lambdas)) {
+    boost_hitters <- gbm(Salary ~ ., data = hitters_train, distribution = "gaussian", n.trees = 1000, shrinkage = lambdas[i])
+    yhat <- predict(boost_hitters, hitters_test, n.trees = 1000)
+    test_error[i] <- mean((yhat - hitters_test$Salary)^2)
+}
+plot(lambdas, test_error, type = "b", xlab = "Valores de Disminución (lambda)", ylab = "Error de Entrenamiento")
+min(test_error)
+lambdas[which.min(test_error)]
+```
+
+Vemos que el mínimo error lo encontramos con lambda = 0.06% y el error mínimo es 25.84%
+
+
+**e) Compare la prueba MSE de boosting con la prueba MSE que resulta de aplicar dos de los enfoques de regresión vistos en los Capítulos 3 y 6.**
+
+```{r}
+fit1 <- lm(Salary ~ ., data = hitters_train)
+pred1 <- predict(fit1, hitters_test)
+mean((pred1 - hitters_test$Salary)^2)
+x <- model.matrix(Salary ~ ., data = hitters_train)
+x_test <- model.matrix(Salary ~ ., data = hitters_test)
+y <- hitters_train$Salary
+fit2 <- glmnet(x, y, alpha = 0)
+pred2 <- predict(fit2, s = 0.01, newx = x_test)
+mean((pred2 - hitters_test$Salary)^2)
+```
+
+Podemos ver que bosting nos entrega el menor error de los modelos probados hasta aqui con 25.84%
+
+
+**f) Cuáles de las variables parecen ser las mas importantes en el modelo Boosting?**
+
+```{r}
+boost_hitters<-gbm(Salary~.,data=hitters_train,distribution = "gaussian",n.trees = 1000,shrinkage=lambdas[which.min(test_error)])
+summary(boost_hitters)
+```
+
+CAtBat, CRBI y CHits son las variables mas importantes en el modelo.
+
+**g) Ahora aplica bagging al set de datos de entrenamiento. Cuál es la tasa de error para esta aproximación?**
+
+```{r}
+set.seed(42)
+hitters_bagging <- randomForest(Salary~.,hitters_train,mtry=19,importance=TRUE)
+hitters_bagg_pred <- predict(hitters_bagging,hitters_test)
+hitters_bagg_test_error <- mean((hitters_bagg_pred-hitters_test$Salary)^2)
+hitters_bagg_test_error
+```
+
+Se observa que el desempeño de este modelo es mejor que el boosting. Para la prueba, arroja un error de 23.36% el cual es inferior al 25.84% encontrado para dicho modelo.
+
+
+## Ejercicio 11
+
+**Esta pregunta utiliza el conjunto de datos "Caravan".**
+
+**a) Cree un conjunto de entrenamiento que consta de las primeras 1000 observaciones, y un conjunto de prueba que consta de las observaciones restantes.**
+
+Separamos el conjunto de datos
+
+```{r}
+set.seed(42)
+train <- 1:1000
+Caravan$Purchase <- ifelse(Caravan$Purchase == "Yes", 1, 0)
+Caravan_train <- Caravan[train, ]
+Caravan_test <- Caravan[-train, ]
+```
+
+
+**b) Ajuste un modelo de boosting al conjunto de entrenamiento con "Compra" como respuesta y las otras variables como predictores. Use 1000 árboles y un valor de contracción de 0.01. ¿Qué predictores parecen ser más importantes?**
+ 
+Construimos el modelo y vemos un resumen 
+
+```{r}
+set.seed(42)
+boost_caravan <- gbm(Purchase ~ ., data = Caravan_train, distribution = "gaussian", n.trees = 1000, shrinkage = 0.01)
+summary(boost_caravan)
+```
+
+Las variables PPERSAUT, MKOOPKLA y MOPLHOOG son los predictores mas importantes.
+
+
+**c) Utilice el modelo de boosting para predecir la respuesta en los datos de la prueba. Predecir que una persona realizará una compra si la probabilidad estimada de compra es superior al 20%. Forma una matriz de confusión. ¿Qué fracción de las personas que predijeron hacer una compra en realidad la hacen? ¿Cómo se compara esto con los resultados obtenidos al aplicar KNN o regresión logística a este conjunto de datos?**
+
+Realizamos las predicciones y revisamos la matriz de confusión
+
+```{r}
+prob_test <- predict(boost_caravan, Caravan_test, n.trees = 1000, type = "response")
+pred_test <- ifelse(prob_test > 0.2, 1, 0)
+predicciones_entrena <- as.factor(pred_test)
+observaciones_entrena <- as.factor(Caravan_test$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+La fracción de personas que se predijo que harían compras y que en efecto la hicieron es del 23%
+
+Probamos con regresión logística y revisamos la matriz de confusión
+
+```{r}
+log_reg <- glm(Purchase ~ ., data = Caravan_train, family = "binomial")
+prob_test2 <- predict(log_reg, Caravan_test, type = "response")
+pred_test2 <- ifelse(prob_test > 0.2, 1, 0)
+predicciones_entrena <- as.factor(pred_test2)
+observaciones_entrena <- as.factor(Caravan_test$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Por regresión logística, a fracción de personas que se predijo que harían compras y que en efecto la hicieron es la misma que por boosting, del 23%.
+
+
+## Ejercicio 12
+
+**Aplique boosting, bagging y bosques aleatorios a un conjunto de datos de su elección. Asegúrese de ajustar los modelos en un conjunto de entrenamiento y evaluar su desempeño en un conjunto de prueba. ¿Cuán precisos son los resultados en comparación con métodos simples como la regresión lineal o logística? ¿Cuál de estos enfoques produce el mejor rendimiento?**
+
+**Utilizaremos el conjunto de datos "Weekly" del paquete "ISLR" para predecir la variable "Dirección".**
+
+Cargamos el set de datos y lo dividimos en dos conjuntos
+
+```{r}
+set.seed(42)
+train <- sample(nrow(Weekly), nrow(Weekly)*.8)
+Weekly$Direction <- ifelse(Weekly$Direction == "Up", 1, 0)
+Weekly_train <- Weekly[train, ]
+Weekly_test <- Weekly[-train, ]
+```
+
+
+Entrenamos con Regresión Logística y revisamos la matriz de confusión
+
+```{r}
+log_reg <- glm(Direction ~ . - Year - Today, data = Weekly_train, family = "binomial")
+log_reg_prob <- predict(log_reg, newdata = Weekly_test, type = "response")
+lr_pred <- ifelse(log_reg_prob > 0.5, 1, 0)
+predicciones_entrena <- as.factor(lr_pred)
+observaciones_entrena <- as.factor(Weekly_test$Direction)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+
+Ahora entrenaremos con boosting y revisamos la matriz de confusión:
+
+```{r}
+boost_model <- gbm(Direction ~ . - Year - Today, data = Weekly_train, distribution = "bernoulli", n.trees = 5000)
+boost_model_prob <- predict(boost_model, newdata = Weekly_test, n.trees = 5000)
+boost_pred <- ifelse(boost_model_prob > 0.5, 1, 0)
+predicciones_entrena <- as.factor(boost_pred)
+observaciones_entrena <- as.factor(Weekly_test$Direction)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Ahora probaremos con bagging y revisamos la matriz de confusión:
+
+```{r}
+bag_model <- randomForest(Direction ~ . - Year - Today, data = Weekly_train, mtry = 6)
+bag_model_prob <- predict(bag_model, newdata = Weekly_test)
+bag_model_pred <- ifelse(bag_model_prob > 0.5, 1, 0)
+predicciones_entrena <- as.factor(bag_model_pred)
+observaciones_entrena <- as.factor(Weekly_test$Direction)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Ahora entrenamos con random forest y revisamos la matriz de confusión:
+
+```{r}
+rf <- randomForest(Direction ~ . - Year - Today, data = Weekly_train, mtry = 2)
+rf_prob <- predict(rf, newdata = Weekly_test)
+rf_pred <- ifelse(rf_prob > 0.5, 1, 0)
+predicciones_entrena <- as.factor(rf_pred)
+observaciones_entrena <- as.factor(Weekly_test$Direction)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Al comparar el accuracy de los 4 clasificadores encontramos que el que mejor desempeño nos muestra es el random forest, mostrando un rendimiento del 57%.
+
+
+# Sección 9.7 
+
+## Ejercicio 4
+
+**Genere un conjunto de datos simulados de dos clases con 100 observaciones y dos características en las que haya una separación visible pero no lineal entre las dos clases. Muestre que en esta configuración, una máquina de vectores de soporte con un núcleo polinomial (con un grado superior a 1) o un núcleo radial superará a un clasificador de vectores de soporte en los datos de entrenamiento. ¿Qué técnica funciona mejor en los datos de prueba? Haga tramas e informe la capacitación y pruebe las tasas de error para respaldar sus afirmaciones.**
+
+
+
+Creamos un dataset con una separación no lineal entre las dos clases
+
+```{r}
+set.seed(42)
+x <- rnorm(100)
+y <- 4 * x^2 + 1 + rnorm(100)
+class <- sample(100, 50)
+y[class] <- y[class] + 3
+y[-class] <- y[-class] - 3
+plot(x[class], y[class], col = "red", xlab = "X", ylab = "Y", ylim = c(-6, 30))
+points(x[-class], y[-class], col = "blue")
+```
+
+Ahora cramos un modelo usando la técnica SVM con los datos de entrenamiento:
+
+```{r}
+set.seed(42)
+z <- rep(-1, 100)
+z[class] <- 1
+data <- data.frame(x = x, y = y, z = as.factor(z))
+train <- sample(100, 50)
+data_train <- data[train, ]
+data_test <- data[-train, ]
+svm <- svm(z ~ ., data = data_train, kernel = "linear", cost = 10)
+plot(svm, data_train)
+svm_pred <- predict(svm, data_train)
+predicciones_entrena <- as.factor(svm_pred)
+observaciones_entrena <- as.factor(data_train$z)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+
+Ahora entrenaremos el clasificador usando kernel polynomial y revisamos la matriz de confusión:
+
+
+```{r}
+svm_poly <- svm(z ~ ., data = data_train, kernel = "polynomial", cost = 10)
+plot(svm_poly, data_train)
+svm_poly_pred <- predict(svm_poly, data_train)
+predicciones_entrena <- as.factor(svm_poly_pred)
+observaciones_entrena <- as.factor(data_train$z)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Ahora entrenamos el un clasificador con un kernel radial y revisamos la matriz de confusión:
+
+```{r}
+svm_radial <- svm(z ~ ., data = data_train, kernel = "radial", gamma = 1, cost = 10)
+plot(svm_radial, data_train)
+svm_rad_pred = predict(svm_radial, data_train)
+predicciones_entrena <- as.factor(svm_rad_pred)
+observaciones_entrena <- as.factor(data_train$z)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Al comparar los modelos entrenados, podemos observar que con el kernel radial se tuvo 0 errores de clasificación. 
+
+Ahora probamos los modelos con la data de prueba y revisamos las matrices de confusión:
+
+
+```{r}
+plot(svm, data_test)
+svm_test_pred <- predict(svm, data_test)
+predicciones_entrena <- as.factor(svm_test_pred)
+observaciones_entrena <- as.factor(data_train$z)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+plot(svm_poly, data_test)
+svm_poly_test_pred <- predict(svm_poly, data_test)
+predicciones_entrena <- as.factor(svm_poly_test_pred)
+observaciones_entrena <- as.factor(data_train$z)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+plot(svm_radial, data_test)
+svm_rad_test_pred <- predict(svm_radial, data_test)
+predicciones_entrena <- as.factor(svm_rad_test_pred)
+observaciones_entrena <- as.factor(data_train$z)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Al revisar las matrices de confusión, podemos decir que el SVM Lineal arroja el mejor desempeño con un accuracy del 60% y 20 observaciones mal clasificadas.
+
+
+## Ejercicio 5
+
+**Hemos visto que podemos ajustar un SVM con un kernel no lineal para realizar la clasificación utilizando un límite de decisión no lineal. Ahora veremos que también podemos obtener un límite de decisión no lineal al realizar una regresión logística utilizando transformaciones no lineales de las características.**
+
+**a) Genere un conjunto de datos con n=500 y p=2, de modo que las observaciones pertenezcan a dos clases con un límite de decisión cuadrático entre ellas.**
+
+Generamos el set de datos
+
+```{r}
+set.seed(42)
+x1 <- runif(500)-0.5
+x2 <- runif(500)-0.5
+y <- 1*(x1^2-x2^2>0)
+```
+
+**b) Grafique las observaciones, coloreadas de acuerdo con sus etiquetas de clase. Su diagrama debe mostrar X1 en el eje x y X2 en el eje y.**
+
+```{r}
+plot(x1,x2,xlab="X1",ylab="X2",col=(4-y),pch=(3-y))
+```
+
+**c) Ajuste un modelo de regresión logística a los datos, utilizando X1 y X2 como predictores.**
+
+Creamos un modelo y vemos el resumen
+
+```{r}
+log_reg <- glm(y~x1+x2,family="binomial")
+summary(log_reg)
+```
+
+Las variables no son significativas
+
+**d) Aplique este modelo a los datos de entrenamiento para obtener una etiqueta de clase predicha para cada observación de entrenamiento. Trace las observaciones, coloreadas de acuerdo con las etiquetas de clase predichas. El límite de decisión debe ser lineal.**
+
+
+```{r}
+data <- data.frame(x1=x1,x2=x2,y=y)
+prob <- predict(log_reg,data,type="response")
+log_reg_pred <- rep(0, 500)
+log_reg_pred[prob > 0.49] <- 1
+plot(data[log_reg_pred == 1,]$x1, data[log_reg_pred == 1, ]$x2, col = (4-1), pch = (3-1), xlab = "X1", ylab = "X2")
+points(data[log_reg_pred == 0, ]$x1, data[log_reg_pred == 0, ]$x2, col = (4-0), pch = (3-0))
+```
+ 
+ El límite de decisión es lineal.
+ 
+**e) Ahora ajuste un modelo de regresión logística a los datos utilizando funciones no lineales de X1 y X2 como predictores.**
+
+Creamos el modelo y vemos el resumen
+
+```{r}
+log_reg_nl <- glm(y~poly(x1,2)+poly(x2,2)+I(x1*x2),family="binomial")
+summary(log_reg_nl)
+```
+
+Nuevamente, no encontramos variables significativas
+
+**f) Aplique este modelo a los datos de entrenamiento para obtener una etiqueta de clase predicha para cada observación de entrenamiento. Trace las observaciones, coloreadas de acuerdo con las etiquetas de clase predichas. El límite de decisión debería ser obviamente no lineal.**
+
+Realizamos las predicciones y graficamos los puntos
+
+```{r}
+prob <- predict(log_reg_nl,data,type="response")
+log_reg_nl_pred <- rep(0,500)
+log_reg_nl_pred[prob > 0.49] <- 1
+plot(data[log_reg_nl_pred == 1, ]$x1, data[log_reg_nl_pred == 1,]$x2,col=(4-1), pch=(3-1), xlab="X1", ylab="X2")
+points(data[log_reg_nl_pred == 0, ]$x1, data[log_reg_nl_pred == 0,]$x2, col=(4-0), pch = (3-0))
+```
+
+El límite de decisión no lineal tiene mucha similitud con el límite de decisión verdadero.
+
+**g) Ajuste un clasificador de vector de soporte a los datos con X1 y X2 como predictores. Obtenga una predicción de clase para cada observación de entrenamiento. Trace las observaciones, coloreadas de acuerdo con las etiquetas de clase predichas.**
+
+Creamos el modelo, realizamos las predicciones y graficamos los puntos
+
+```{r}
+data$y <- as.factor(data$y)
+svm.fit <- svm(y ~ x1 + x2, data, kernel = "linear", cost = 0.01)
+preds <- predict(svm.fit, data)
+plot(data[preds == 1, ]$x1, data[preds == 1,]$x2,col=(4-1), pch=(3-1), xlab="X1", ylab="X2")
+points(data[preds == 0, ]$x1, data[preds == 0,]$x2, col=(4-0), pch = (3-0))
+
+```
+
+El clasificador a predicho todas las informaciones en una misma clase.
+
+**h) Ajuste un SVM usando un kernel no lineal a los datos con X1 y X2 como predictores. Obtenga una predicción de clase para cada observación de entrenamiento. Trace las observaciones, coloreadas de acuerdo con las etiquetas de clase predichas.**
+
+Creamos el modelo, realizamos las predicciones y graficamos los puntos
+
+```{r}
+data$y <- as.factor(data$y)
+svm_nl <- svm(y ~ x1 + x2, data, kernel = "radial", gamma = 1)
+preds <- predict(svm_nl, data)
+plot(data[preds == 0, ]$x1, data[preds == 0, ]$x2, col = (4-0), pch = (3-0), xlab = "X1", ylab = "X2")
+points(data[preds == 1, ]$x1, data[preds == 1, ]$x2, col = (4-1), pch = (3-1))
+```
+
+De nuevo podemos ver que el límite de decisión no lineal es muy similar al observado con los datos verdaderos.
+
+**i) Comente sus resultados.**
+
+Podemos concluir que SVM con kernel no lineal y regresión logística con términos de interacción son igualmente muy poderosos para encontrar límites de decisión no lineales. Además, SVM con kernel lineal y regresión logística sin ningún término de interacción son muy malos cuando se trata de encontrar límites de decisión no lineales. Sin embargo, un argumento a favor de SVM es que requiere un poco de ajuste manual para encontrar los términos de interacción correctos cuando se usa la regresión logística, aunque cuando se usa SVM solo necesitamos ajustar gamma. 
+
+
+## Ejercicio 6
+
+**Al final de la Sección 9.6.1, se afirma que en el caso de los datos que son apenas separables linealmente, un clasificador de vectores de soporte con un pequeño valor de "costo" que clasifica erróneamente un par de observaciones de entrenamiento puede tener un mejor rendimiento en los datos de prueba que uno con un gran valor de "costo" que no clasifique erróneamente ninguna observación de capacitación. Ahora investigará esa afirmación.**
+
+**a) Genere datos de dos clases con p=2 de tal manera que las clases sean apenas linealmente separables.**
+
+```{r}
+set.seed(42)
+obs = 1000
+x1 <- runif(obs, min = -4, max = 4)
+x2 <- runif(obs, min = -1, max = 16)
+y <- ifelse(x2 > x1 ^ 2, 0, 1)
+dat <- data.frame(x1 = x1, x2 = x2, y = as.factor(y))
+train <- sample(obs, obs/2)
+dat_train <- dat[train, ]
+dat_test <- dat[-train, ]
+par(mfrow = c(1,2))
+plot(dat_train$x1, dat_train$x2, col = as.integer(dat_train$y) + 1, main = 'Datos de entrenamiento')
+plot(dat_test$x1, dat_test$x2, col = as.integer(dat_test$y) + 1, main = 'Datos de prueba')
+
+```
+
+**b) Calcule las tasas de error de validación cruzada para los clasificadores de vectores de soporte con un rango de valores de "costo". ¿Cuántos errores de capacitación se clasifican erróneamente para cada valor de "costo" considerado y cómo se relaciona esto con los errores de validación cruzada obtenidos?**
+
+
+```{r}
+set.seed(42)
+rm(svm)
+costo <- c(0.001, 0.01, 0.1, 1, 5, 10, 100, 10000)
+tune_out <- tune(method= svm, y ~., data = dat_train, kernel = 'linear', ranges = list(cost = costo))
+summary(tune_out)
+```
+
+
+```{r}
+svm_train_error <- rep(NA, length(costo))
+for (cost in costo) {
+  svm_fit <- svm(y ~ ., data = dat_train, kernel = 'linear', cost = cost)
+  plot(svm_fit, data = dat_train)
+  res <- table(prediction = predict(svm_fit, newdata = dat_train), truth = dat_train$y)
+  svm_train_error[match(cost, costo)] <- (res[2,1] + res[1,2]) / sum(res)
+}
+```
+
+
+```{r}
+svm_train_error
+paste('El costo', costo[which.min(svm_train_error)], 'tiene el mínimo error de :', min(svm_train_error))
+```
+
+
+**c)Genere un conjunto de datos de prueba adecuado y calcule los errores de prueba correspondientes a cada uno de los valores de costo considerados. ¿Qué valor del costo conduce a la menor cantidad de errores de prueba, y cómo se compara esto con los valores de costo que producen la menor cantidad de errores de capacitación y la menor cantidad de errores de validación cruzada?**
+
+
+```{r}
+svm_test_error <- rep(NA, length(costo))
+for (cost in costo) {
+  svm_fit <- svm(y ~ ., data = dat_train, kernel = 'linear', cost = cost)
+  res <- table(prediction = predict(svm_fit, newdata = dat_test), truth = dat_test$y)
+  svm_test_error[match(cost, costo)] <- (res[2,1] + res[1,2]) / sum(res)
+}
+```
+
+
+```{r}
+svm_test_error
+paste('El costo', costo[which.min(svm_test_error)], 'tiene el mínimo error de pruebas:', min(svm_test_error))
+```
+
+**d) Comente los reusltados.**
+
+Se observa que con un kernel lineal con costos pequeños o grandes el error de prueba es pequeño, pero si el costo es demasiado pequeño o demasiado grande, el error es alto.
+
+
+## Ejercicio 7
+
+**En este problema, utilizará SVM para predecir si un automóvil determinado obtiene un consumo de combustible alto o bajo en función del conjunto de datos "Auto".**
+
+**a) Cree una variable binaria que tome un 1 para los automóviles con millaje de gasolina por encima de la mediana, y un 0 para automóviles con millaje de gasolina por debajo de la mediana.**
+
+
+```{r}
+variable <- ifelse(Auto$mpg > median(Auto$mpg), 1, 0)
+Auto$mpglevel <- as.factor(variable)
+```
+
+**b) Ajuste un clasificador de vector de soporte a los datos con varios valores de "costo", con el fin de predecir si un automóvil tiene un alto rendimiento de bajo consumo de combustible. Informe los errores de validación cruzada asociados con diferentes valores de este parámetro. Comenta tus resultados.**
+
+
+```{r}
+set.seed(42)
+rm(svm)
+costo = c(0.01, 0.1, 1, 5, 10, 100, 1000)
+tune_out <- tune(svm, mpglevel ~ ., data = Auto, kernel = "linear", ranges = list(cost = costo))
+summary(tune_out)
+```
+
+
+El costo de 1e-02 arroja el mínimo error
+
+
+**c) Ahora repita (b), esta vez usando SVM con núcleos radiales y polinomiales, con diferentes valores de "gamma" y "grado" y "costo". Comenta tus resultados.**
+
+SVM Polinominal
+
+```{r}
+set.seed(42)
+rm(svm)
+tune_out <- tune(svm, mpglevel ~ ., data = Auto, kernel = "polynomial", ranges = list(cost = c(0.01, 0.1, 1, 5, 10, 100), degree = c(2, 3, 4)))
+summary(tune_out)
+```
+
+Para el kernel polinomial vemos que el minimo error se encuentra con costo de 100.
+
+SVM Radial
+
+```{r}
+set.seed(42)
+rm(svm)
+tune_out <- tune(svm, mpglevel ~ ., data = Auto, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 5, 10, 100), gamma = c(0.01, 0.1, 1, 5, 10, 100)))
+summary(tune_out)
+```
+
+Para el kernel radial, vemos que el minimo error se encuentra con costo de 100.
+
+
+**d) Haga algunos gráficos para respaldar sus afirmaciones en (b) y (c).**
+
+```{r}
+svm_linear <- svm(mpglevel ~ ., data = Auto, kernel = "linear", cost = 1)
+svm_poly <- svm(mpglevel ~ ., data = Auto, kernel = "polynomial", cost = 100, degree = 2)
+svm_radial <- svm(mpglevel ~ ., data = Auto, kernel = "radial", cost = 100, gamma = 0.01)
+plotpairs = function(fit) {
+    for (name in names(Auto)[!(names(Auto) %in% c("mpg", "mpglevel", "name"))]) {
+        plot(fit, Auto, as.formula(paste("mpg~", name, sep = "")))
+    }
+}
+plotpairs(svm_linear)
+plotpairs(svm_poly)
+plotpairs(svm_radial)
+```
+
+
+## Ejercicio 8
+
+**Este problema involucra el conjunto de datos "OJ" que es parte del paquete ISLR.**
+
+**a) Cree un conjunto de entrenamiento que contenga una muestra aleatoria de 800 observaciones, y un conjunto de prueba que contenga las observaciones restantes.**
+
+Dividimos el set de datos
+
+```{r}
+set.seed(42)
+train <- sample(nrow(OJ), 800)
+train_oj <- OJ[train, ]
+test_oj <- OJ[-train, ]
+```
+
+
+**b) Ajuste un clasificador de vector de soporte a los datos de entrenamiento usando "costo" = 0.01, con "Compra" como respuesta y las otras variables como predictores. Use la función summary () para generar estadísticas resumidas y describir los resultados obtenidos.**
+
+Creamos el modelo y revisamos el resumen
+
+```{r}
+svm <- svm(Purchase ~ ., data = train_oj, kernel = "linear", cost = 0.01)
+summary(svm)
+```
+
+El svm ha creado 432 vectores de soporte de 800 puntos de entrenamiento. De estos, 217 pertenecen al nivel MM y los 215 restantes pertenecen al nivel CH. *
+
+
+**c) ¿Cuáles son las tasas de error de capacitación y prueba?**
+
+Realizamos las predicciones en entrenamiento y revisamos la matriz de confusión
+
+```{r}
+svm_pred <- predict(svm, train_oj)
+predicciones_entrena <- as.factor(svm_pred)
+observaciones_entrena <- as.factor(train_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+La tasa de error en entrenamiento es de 17.12%
+
+Realizamos las predicciones en pruebas y revisamos la matriz de confusión
+
+```{r}
+svm_test_pred <- predict(svm, test_oj)
+predicciones_entrena <- as.factor(svm_test_pred)
+observaciones_entrena <- as.factor(test_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+La tasa de error en prueba es de 16.3%
+
+
+**d) Use la función tune () para seleccionar un "costo" óptimo. Considere valores en el rango de 0.01 a 10.**
+
+
+```{r}
+set.seed(42)
+rm(svm)
+tune_out <- tune(svm, Purchase ~ ., data = train_oj, kernel = "linear", ranges = list(cost = 10^seq(-2, 1, by = 0.25)))
+summary(tune_out)
+```
+
+Encontramos el error mínimo con el cost igual a 1.
+
+**e) Calcule las tasas de error de capacitación y prueba utilizando este nuevo valor para "costo".**
+
+```{r}
+svm <- svm(Purchase ~ ., kernel = "linear", data = train_oj, cost = tune_out$best.parameter$cost)
+train_pred <- predict(svm, train_oj)
+predicciones_entrena <- as.factor(train_pred)
+observaciones_entrena <- as.factor(train_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+test_pred <- predict(svm, test_oj)
+predicciones_entrena <- as.factor(test_pred)
+observaciones_entrena <- as.factor(test_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Vemos que el menor error en entrenamiento es de 16.75% y en prueba es de 16.3%.
+
+**f) Repita las partes (b) a (e) usando una máquina de vectores de soporte con un kernel radial. Use el valor predeterminado para "gamma".**
+
+
+```{r}
+svm_radial <- svm(Purchase ~ ., kernel = "radial", data = train_oj)
+summary(svm_radial)
+train_pred <- predict(svm_radial, train_oj)
+predicciones_entrena <- as.factor(train_pred)
+observaciones_entrena <- as.factor(train_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+test_pred <- predict(svm_radial, test_oj)
+predicciones_entrena <- as.factor(test_pred)
+observaciones_entrena <- as.factor(test_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+test.pred <- predict(svm_radial, test_oj)
+```
+
+Usando el kernel radial y el gamma por defecto, encontramos un error en entrenamiento del 15% y uno de pruebas de: 15.93%.
+
+
+```{r}
+set.seed(42)
+rm(svm)
+tune_out <- tune(svm, Purchase ~ ., data = train_oj, kernel = "radial", ranges = list(cost = 10^seq(-2, 1, by = 0.25)))
+summary(tune_out)
+svm_radial <- svm(Purchase ~ ., kernel = "radial", data = train_oj, cost = tune_out$best.parameter$cost)
+summary(svm_radial)
+train_pred <- predict(svm_radial, train_oj)
+predicciones_entrena <- as.factor(train_pred)
+observaciones_entrena <- as.factor(train_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+test_pred <- predict(svm_radial, test_oj)
+predicciones_entrena <- as.factor(test_pred)
+observaciones_entrena <- as.factor(test_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+El ajuste no redujo el error que observaamos en el punto anterior, aqui se tiene un error mínimo de 17.75% con costo 1.778.
+
+**g) Repita las partes (b) a (e) usando una máquina de vectores de soporte con un kernel polinomial. Establecer "grado" = 2.**
+
+
+```{r}
+svm_poly <- svm(Purchase ~ ., kernel = "polynomial", data = train_oj, degree = 2)
+summary(svm_poly)
+train_pred <- predict(svm_poly, train_oj)
+predicciones_entrena <- as.factor(train_pred)
+observaciones_entrena <- as.factor(train_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+test_pred <- predict(svm_poly, test_oj)
+predicciones_entrena <- as.factor(test_pred)
+observaciones_entrena <- as.factor(test_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Con el kernel radial el error no mejora, se obtiene un error de 17.88% en entrenamiento y de 19.63% en pruebas.
+
+Ahora probamos tuneando el modelo:
+
+```{r}
+set.seed(42)
+rm(svm)
+tune_out <- tune(svm, Purchase ~ ., data = train_oj, kernel = "polynomial", degree = 2, ranges = list(cost = 10^seq(-2, 1, by = 0.25)))
+summary(tune_out)
+svm_poly <- svm(Purchase ~ ., kernel = "polynomial", degree = 2, data = train_oj, cost = tune_out$best.parameter$cost)
+summary(svm_poly)
+train_pred <- predict(svm_poly, train_oj)
+predicciones_entrena <- as.factor(train_pred)
+observaciones_entrena <- as.factor(train_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+test_pred <- predict(svm_poly, test_oj)
+predicciones_entrena <- as.factor(test_pred)
+observaciones_entrena <- as.factor(test_oj$Purchase)
+matriz <- confusionMatrix(observaciones_entrena, predicciones_entrena)
+matriz
+```
+
+Tuneando se reduce el error, ya que arroja un 16.38% en entrenamiento y un 16.67% en pruebas.
+
+**h) En general, ¿qué enfoque parece dar los mejores resultados con estos datos?**
+
+En general, con el kernel radial produjo el mejor rendimiento sin tunear los parámetros.
+
+
+
+

@@ -1,0 +1,141 @@
+---
+title: "Introducción al análisis de grupos"
+author: "Juan David Ospina Arango <br/> Universidad Nacional de Colombia - Sede Medellín <br/> Departamento de Ciencias de la Computación y de la Decisión <br/> Técnicas de aprendizaje estadístico"
+date: "Semestre 02-2019"
+output:
+  html_document: default
+  html_notebook: default
+  word_document: default
+---
+
+Este documento trabaja el análisis de grupos como una ténica de [aprendizaje no supervisado](https://en.wikipedia.org/wiki/Unsupervised_learning). Se consideran métodos no supervisados porque las observaciones no tienen una clasificación *a priori*. En lugar de ello queremos ver si las observaciones se agrupan de manera natural.
+
+# El problema del agrupamiento
+Dadas las observaciones $\mathbf{x_1}$, ..., $\mathbf{x_n}$, que pertenecen a $\mathbb{R}^d$ queremos agruparlos de manera que:
+
++ Las observaciones de un mismo grupo sean muy similares
++ Las observaciones de dos grupos diferentes sean muy diferentes.
+
+Esto requiere dos cosas:
+
++ Un criterio (o medida) de similaridad
++ Una estrategia para crear los grupos que optimice este criterio para obtener grupos.
+
+
+Una manera de crear los grupos es utilizando [métodos de particionamiento](https://en.wikipedia.org/wiki/Recursive_partitioning), como por ejemplo [árboles de decisión](https://en.wikipedia.org/wiki/Decision_tree_learning) o [bosques aleatorios](https://en.wikipedia.org/wiki/Random_forest). Estos métodos tiene la ventaja de poder considerar simultáneamente variables cualitativas y cuantitativas. En este documento nos enfocaremos en los métodos de [agrupamiento jerárquico](https://en.wikipedia.org/wiki/Hierarchical_clustering).
+
+## Similaridad
+Comenzaremos por tratar la noción de similaridad. En términos matemáticos, dos observaciones son similares si están cerca en términos de una función de distancia. De esta manera las nociones de cercanía y similaridad son prácticamente equivalentes en el análisis de grupos.
+
+Una distancia en $\mathbb{R}^d$ es una función $d: \mathbb{R}^d \times \mathbb{R}^d \rightarrow [0,+\infty)$ tal que para las observaciones $\mathbf{x_1}$, $\mathbf{x_2}$ y $\mathbf{x_3}$, entonces:
+
++ $d(\mathbf{x_1},\mathbf{x_2})\geq 0$, para todo $\mathbf{x_1}$ y $\mathbf{x_2}$
++ $d(\mathbf{x_1},\mathbf{x_2})=0$ si y solo si $\mathbf{x_1}=\mathbf{x_2}$,
++ $d(\mathbf{x_1},\mathbf{x_2})=d(\mathbf{x_2},\mathbf{x_1})$,
++ $d(\mathbf{x_1},\mathbf{x_2})\leq d(\mathbf{x_1},\mathbf{x_3})+d(\mathbf{x_3},\mathbf{x_2})$.
+
+La similaridad se define en términos de una función de distancia y la disimilaridad en términos de la similaridad.
+
+Ejemplos de medidas de similaridad son la aplicación de las normas conocidas sobre la diferencia entre dos observaciones:
+
+1. Norma-p: $d(\mathbf{x_1},\mathbf{x_2})=(\sum_{j=1}^{d}|x_j^{(1)}-x_j^{(2)}|)^{1/2}$. Esta norma es sensible a las escalas de las variables.
+2. Norma infinito: $d(\mathbf{x_1},\mathbf{x_2})=sup_{1\leq j \leq d} |x_j^{(1)}-x_j^{(2)}|$. Esta norma es sensible a las escalas de las variables.
+3. Mahalanobis: $d(\mathbf{x_1},\mathbf{x_2})=(\mathbf{x_1}-\mathbf{x_2})^TS^{-1}(\mathbf{x_1}-\mathbf{x_2})$, donde $S$ es la matriz de varianzas y covarianzas de las observaciones. Esta distancia es invariante a transformaciones de la forma $A\mathbf{x}+\mathbf{b}$ (A matriz). 
+4. Canberra: $d(\mathbf{x_1},\mathbf{x_2})=\frac{1}{d}\sum_{j}\frac{|x_j^{(1)}-x_j^{(2)}|}{|x_j^{(1)}+x_j^{(2)}|}$. Esta norma se utiliza sobre todo para objetos binarios.
+
+## Métodos aglomerativos
+Si se tienen $n$ observaciones $\mathbf{x_1}$, ..., $\mathbf{x_n}$, se comienza con $n$ grupos y con la matriz de distancias $D=(d_{ij})=d(\mathbf{x}_i,\mathbf{x}_j)$. En este método se "aglomeran" las observaciones, es decir que si varias observaciones se agrupan entonces ellas se reemplazan por una nueva observación que las represente (i.e el promedio de todas ellas).
+
+Como se dijo antes, se comienza con $n$ grupos donde cada observación es un grupo. A partir de esto los pasos son los siguientes:
+
+1. Se fusionan los dos grupos más cercanos. Así se tienen $n-2$ grupos que contienen una observación y un grupo que contiene dos observaciones. En total hay $n-1$ grupos.
+2. Se fusionan los dos grupos más cercanos para obtener $n-2$ grupos.
+3. Se continúa de esta manera hasta llegar a un solo grupo.
+
+A medida que las observaciones se aglomeran en grupos es necesario entonces medir la distancia entre grupos. Algunas distancias entre grupos son $G_1$ y $G_2$:
+
++ Single linkage: $\Delta(G_1,G_2)=\min_{\mathbf{x} \in G_1,\mathbf{y} \in G_2,} d(\mathbf{x},\mathbf{y})$
++ Complete linkage: $\Delta(G_1,G_2)=\max_{\mathbf{x} \in G_1,\mathbf{y} \in G_2,} d(\mathbf{x},\mathbf{y})$
++ Centroide: $\Delta(G_1,G_2)=d(\mathbf{\bar {x}}_{G_1},\mathbf{\bar {x}}_{G_2})$, donde $\mathbf{\bar {x}}_{G_1}$ y $\mathbf{\bar {x}}_{G_2}$ son los centroides de los grupos $G_1$ y $G_2$ respectivamente, que se pueden definir como la observación promedio de cada grupo. El centroide del grupo resultante de la unión de los grupos $G_1$ y $G_2$ se puede definir como $\mathbf{\bar {x}}_{G_1,G_2}=\frac{|G_1| \mathbf{\bar {x}}_{G_1} +|G_2| \mathbf{\bar {x}}_{G_2}}{|G_1|+|G_2|}$, donde $|G_i|$ es el número de observaciones en el grupo $i$.
++ Suma de cuadrados incremental (Ward): se fusionan los grupos $G_1$ y $G_2$ que minimicen el funcional $I(G_1,G_2)$:
+$$I(G_1,G_2)=\sum_{\mathbf{x} \in G_1 \cup G_2}{d^2(\mathbf{x},\mathbf{\bar {x}}_{G_1,G_2})}-\{\sum_{\mathbf{x} \in G_1 }{d^2(\mathbf{x},\mathbf{\bar {x}}_{G_1})}+\sum_{\mathbf{x} \in G_2}{d^2(\mathbf{x},\mathbf{\bar {x}}_{G_2})} \}.$$
+
+
+## Ejemplo (single linkage):
+Consideremos la siguiente matriz de distancias:
+
+```{r echo=FALSE}
+D=matrix(c(0,7,1,9,8,7,0,6,3,5,1,6,0,8,7,9,3,8,0,4,8,5,7,4,0),ncol=5)
+colnames(D)=as.character(1:5)
+rownames(D)=as.character(1:5)
+print(D)
+```
+
+
+
+1. Los dos grupos más cercanos son los conformados por el grupo que tiene la observación 1 y el que tiene la observación 3. La distancia entre estos grupos es $h=1$. Estos dos grupos constituirán un nuevo grupo. Así, la nueva matriz de distancias es:
+
+```{r echo=FALSE}
+D1=matrix(c(0,6,8,7,6,0,3,5,8,3,0,4,7,5,4,0),ncol=4)
+colnames(D1)=c("G13",2,4,5)
+rownames(D1)=c("G13",2,4,5)
+print(D1)
+```
+
+
+
+2. Ahora son el grupo conformado por la observación 2 y el grupo conformado por la observación 4 los más cercanos. La distancia entre estos dos grupos es $h=3$. Al fusionarlos tenemos la siguiente matriz de distancias:
+
+```{r echo=FALSE}
+D2=matrix(c(0,6,5,6,0,4,5,4,0),ncol=3)
+colnames(D2)=c("G13","G24",5)
+rownames(D2)=c("G13","G24",5)
+print(D2)
+```
+
+
+
+
+3. Ahora son el grupo conformado por la observación 5 y el grupo G24 los que se fusionarán. La distancia entre estos dos grupos es $h=4$. La matriz de distancias actualizada es:
+
+```{r echo=FALSE}
+D3=matrix(c(0,5,5,0),ncol=2)
+colnames(D3)=c("G12","G245")
+rownames(D3)=c("G12","G245")
+print(D3)
+```
+
+4. Finalmente, la distancia entre los dos grupos resultantes es de $h=5$.
+
+Podemos representar esto con ayuda de un dendograma, así:
+
+```{r echo=TRUE}
+D_dist=as.dist(D)
+d_tree=hclust(D_dist,method="single")
+plot(d_tree, main="Dendograma")
+```
+
+## Ejemplo: USArrest
+Consideremos la base de datos *USArrest* que contiene información tasas de crímene en ciudades de Estados Unidos:
+
+```{r}
+data("USArrests")
+head(USArrests)
+```
+
+Apliquemos la metodología anterior:
+
+```{r}
+USArrests_dist=dist(USArrests)
+USArrests_clust=hclust(USArrests_dist,method="single")
+plot(USArrests_clust)
+```
+
+Si queremos segmentar el conjunto de ciudades, por ejemplo en seis grupos, podemos proceder así:
+
+```{r}
+USArrests_clust_4=cutree(USArrests_clust,k=6)
+plot(USArrests_clust)
+rect.hclust(USArrests_clust,k=6)
+```
+

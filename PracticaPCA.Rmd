@@ -1,0 +1,442 @@
+---
+title: "ReduccionVariables"
+author: "Santiago Arboleda"
+date: "29/1/2020"
+output: html_document
+---
+
+Consideremos el conjunto USArrests que contiene las estadísticas de arrestos por tipo de crimen por cada cien mil habitantes en los estados de Estados Unidos en 1973.
+
+
+Cargamos el set de datos
+
+```{r}
+head(USArrests)
+```
+
+El set de datos tiene las siguientes dimensiones
+
+```{r}
+dim(USArrests)
+```
+
+Las 4 variables son:
+
+```{r}
+names(USArrests)
+```
+
+Veamos algunas relaciones por pares de variables:
+
+```{r}
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+
+pairs(USArrests, lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE)
+```
+
+Normalización de los datos
+
+Veamos que pasa con las relaciones por pares cuando se centran y escalan los datos:
+
+```{r}
+
+# Centrado y escalado de los datos: se resta la media y se divide por la desviación estándar.
+datos_centrados<-scale(USArrests,center = TRUE,scale = TRUE)
+# Misma gráfica anterior pero con los datos escalados:
+pairs(datos_centrados, lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE)
+
+```
+
+Observemos que podemos obtener la media y la desviación estándar utilizados para escalar la matriz de la siguiente manera:
+
+
+
+```{r}
+media<-attr(datos_centrados,"scaled:center")
+print("Media:")
+(media<-attr(datos_centrados,"scaled:center"))
+```
+
+
+```{r}
+print("Desviación estándar:")
+(desv_est<-attr(datos_centrados,"scaled:scale"))
+```
+
+Matriz de covarianzas
+
+Ahora obtengamos la matriz de varianzas y covarianzas:
+
+```{r}
+(Sigma<-cov(datos_centrados))
+```
+
+Descomposición espectral de la matriz de covarianzas
+Ahora obtengamos la descomposición espectral de Sigma:
+
+```{r}
+descomp_espectr<-eigen(Sigma)
+lambdas<-descomp_espectr$values
+D<-descomp_espectr$vectors
+```
+
+Los valores propios son:
+
+```{r}
+lambdas
+
+```
+
+Los vectores propios son:
+
+```{r}
+D
+```
+
+Proyección de los datos en el espacio de componentes principales
+
+A continuación se proyectan los datos en el espacio de componentes principales:
+
+```{r}
+datos_proyectados<-t(t(D)%*%t(datos_centrados))
+# datos_proyectados<-datos_centrados%*%D # Esto es una pista
+
+```
+
+Veamos cómo se ven las relaciones en el espacio de las componentes principales:
+
+```{r}
+pairs(datos_proyectados, lower.panel = panel.smooth, upper.panel = panel.cor,
+      gap=0, row1attop=FALSE)
+```
+
+La correlación entre las variables proyectadas es cero.
+
+Veamos cuál es el porcentaje de varianza explicado por cada componente:
+
+```{r}
+porcentaje_exp<-(lambdas)/sum(lambdas)*100
+barplot(porcentaje_exp,names.arg=paste0("comp",1:4),las=1)
+title(main="Porcentaje de variabilidad atribuido a cada componente")
+
+```
+
+Es decir, que si tomamos las dos primeras componentes principales tendríamos aproximadamente el 87% de la variabilidad del conjunto oringinal.
+
+Esto quiere decir que podríamos reemplazar el conjunto de datos original por el conjunto de datos proyectado incluyendo solo las dos primeras columnas, así:
+
+
+```{r}
+datos_proyectados[,1:2]
+```
+
+Reducción de la dimensionalidad
+
+Proyectemos los datos usando solo los dos primeros vectores propios:
+
+```{r}
+D_red<-D[,1:2]
+lambdas_red<-lambdas[1:2]
+(datos_reducidos<-datos_centrados%*%D_red) # Esto es igual a datos_proyectados[,1:2]
+
+```
+
+Reconstrucción de la matriz de covarianzas
+
+También se puede reconstruir la matriz de covarianzas escalada (luego es una matriz de correlación) y mirar la calidad de la reconstrucción:
+
+```{r}
+Sigma_rec<-D_red%*%diag(lambdas_red)%*%t(D_red)
+print(Sigma_rec)
+```
+
+Reconstrucción de los datos originales a partir de la proyección en las dos primeras componentes principales
+
+Reconstruyamos los datos escalados a partir de la proyección en las dos primeras componentes principales
+
+```{r}
+datos_reconstruidos_esc_cent<-datos_reducidos%*%t(D_red)
+```
+
+Ahora reescalemos los datos reconstruidos para llevarlos a la escala orginal y ver la calidad de la reconstrucción. Para ello primero hay que multiplicar por la desviación estándar y luego sumar la media. La función scale() puede hacer esto, pero por defecto esta función primero centra y luego escala. Por esto debemos usarla primero para escalar y luego para centrar:
+
+
+```{r}
+datos_reconstruidos_cent<-scale(datos_reconstruidos_esc_cent,center =FALSE,scale = 1/desv_est)
+datos_reconstruidos<-scale(datos_reconstruidos_cent,center =(-media),scale = FALSE)
+datos_reconstruidos<-as.data.frame(datos_reconstruidos)
+datos_reconstruidos
+
+```
+
+Ejercicios:
+
+1- Reproduzca la expresión en componentes principales y la reducción de dimensionalidad usando la función princomp().
+
+Computamos PCA
+
+```{r}
+res.pca <- prcomp(USArrests, scale = FALSE)
+
+```
+
+Visualizamos valores propios. Muestra el porcentaje de variaciones explicado por cada componente principal.
+
+```{r}
+library(factoextra)
+fviz_eig(res.pca)
+```
+
+Las ciudades con un perfil similar se agrupan:
+
+```{r}
+fviz_pca_ind(res.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+```
+
+Gráficamos las variables
+
+Las variables positivas correlacionadas apuntan al mismo lado de la gráfica. Las variables negativas correlacionadas apuntan a lados opuestos de la gráfica.
+
+```{r}
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+```
+
+```{r}
+fviz_pca_biplot(res.pca, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "#696969"  # Individuals color
+                )
+```
+
+Acceso a los resultados del PCA
+
+```{r}
+# Eigenvalues
+eig.val <- get_eigenvalue(res.pca)
+eig.val
+```
+
+Resultados por variables
+
+```{r}
+# Results for Variables
+res.var <- get_pca_var(res.pca)
+res.var$coord          # Coordinates
+res.var$contrib        # Contributions to the PCs
+res.var$cos2           # Quality of representation 
+```
+
+Resultados por individuos
+
+```{r}
+# Results for individuals
+res.ind <- get_pca_ind(res.pca)
+res.ind$coord          # Coordinates
+res.ind$contrib        # Contributions to the PCs
+res.ind$cos2           # Quality of representation
+
+```
+
+Otra forma
+
+```{r}
+pca.res <- prcomp(USArrests, scale = TRUE)
+pca.res$rotation
+
+```
+
+Revisando la contribución de cada componente principal
+
+```{r}
+pca.var =pca.res$sdev ^2
+pca.var
+```
+
+
+```{r}
+## Formula interface
+princomp(~ ., data = USArrests, cor = TRUE)
+
+```
+
+
+The percentage of variance explained by each principal component:
+
+62% of the variance is explained by the first principal component, 25% by the second principal component, 9% by the third principal component and the remaining 4% by the last principal component.
+Hence a large proportion of the variance is explained by the first 2 principal components
+
+
+```{r}
+var.ratio=pca.var/sum(pca.var)
+var.ratio
+```
+
+
+Chosing the number of required Principal components:
+
+We typically decide on the number of principal components required to visualize the data by examining a scree plot. We choose the smallest number of principal components that are required in order to explain a sizable amount of the variation in the data. We try to find out the points after which the variation explained starts to drop off. This also called the elbow point.
+
+We see that a fair amount of variance is explained by the first two principal components, and that there is an elbow after the second component.
+
+
+```{r}
+plot(var.ratio , xlab=" Principal Component ", ylab=" Proportion of
+Variance Explained ", ylim=c(0,1) ,type="b")
+```
+
+
+We already saw that third principal component explained less than 10% variance and the last was almost negligible. Hence we decide to go with two principal components
+
+```{r}
+plot(cumsum (var.ratio), xlab=" Principal Component ", ylab ="
+Cumulative Proportion of Variance Explained ", ylim=c(0,1) ,
+     type="b")
+```
+
+1- Reproduzca la expresión en componentes principales y la reducción de dimensionalidad usando la función princomp()
+
+```{r}
+p1 <- princomp(USArrests, cor = TRUE)  ## using correlation matrix
+## p1 <- princomp(USArrests)  ## using covariance matrix
+
+```
+
+```{r}
+summary(p1)
+
+```
+
+```{r}
+loadings(p1)
+```
+```{r}
+plot(p1)
+```
+
+```{r}
+library(factoextra)
+fviz_pca_biplot(p1, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "#696969"  # Individuals color
+                )
+```
+
+```{r}
+
+fviz_pca_var(p1,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+
+```
+
+```{r}
+library(factoextra)
+fviz_eig(p1)
+```
+
+
+```{r}
+p1$scores
+```
+
+
+
+
+```{r}
+screeplot(p1, npcs=4, type="lines")
+```
+
+```{r}
+## Formula interface
+princomp(~ ., data = USArrests, cor = TRUE) ## identical with princomp(USArrests, cor = TRUE)
+p2 <- princomp(~ Murder + Assault + UrbanPop, data = USArrests, cor = TRUE)
+p2$scores
+
+
+```
+
+
+2- Lleve a cabo un agrupamiento jerárquico de las ciudades usando i) los datos centrados y escalados y ii) los datos proyectados en las dos primeras componentes principales. Utilice en ambos casos las mismas distancias entre individuos y entre grupos. Compare los grupos obtenidos.
+
+
+i) Calculamos la matriz de distancia:
+
+```{r}
+p1$scale
+```
+
+```{r}
+USArrests_dist=dist(p1$scores)
+USArrests_clust=hclust(USArrests_dist,method="single")
+plot(USArrests_clust)
+
+```
+
+```{r}
+USArrests_dist2=dist(datos_centrados)
+USArrests_clust2=hclust(USArrests_dist2,method="single")
+plot(USArrests_clust2)
+```
+
+ii)
+
+```{r}
+USArrests_dist=dist(p1$scores[,1:2])
+USArrests_clust=hclust(USArrests_dist,method="single")
+plot(USArrests_clust)
+
+```
+
+
+3- Utilizando lo visto sobre la descomposición en valores propios reconstruya la matemática de la reducción de la dimensionalidad presentada en este documento.
+
+```{r}
+# Reconstruir el objeto PCA 
+# prcomp will center the variables so you need to add the subtracted means back
+
+    # t(t(pca$x %*% t(pca$rotation)) + pca$center)
+
+# Si pca$scale es TRUE tambien se necesitara reescalar 
+
+    # t(t(pca$x %*% t(pca$rotation)) * pca$scale + pca$center)
+
+t(t(p1$scores %*% t(loadings(p1)))* p1$scale  + p1$center)
+
+```
+
+
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+

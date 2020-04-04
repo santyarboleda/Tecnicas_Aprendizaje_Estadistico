@@ -1,0 +1,199 @@
+---
+title: "Agrupamiento"
+author: "Santiago Arboleda"
+date: "27/1/2020"
+output: html_document
+---
+
+
+Cargamos el dataset
+
+```{r}
+data("USArrests")
+head(USArrests)
+```
+
+Vemos un resumen de los datos:
+
+```{r}
+summary(USArrests)
+```
+
+
+Calculamos la matriz de distancia:
+
+```{r}
+USArrests_dist=dist(USArrests)
+USArrests_clust=hclust(USArrests_dist,method="single")
+plot(USArrests_clust)
+```
+
+
+```{r}
+USArrests_clust_4=cutree(USArrests_clust,k=4)
+plot(USArrests_clust)
+rect.hclust(USArrests_clust,k=4)
+```
+
+K-MEANS 
+
+
+Normalizamos los datos
+
+```{r}
+
+df <- scale(USArrests) # Scaling the data
+# Como la variable UrbanPop està en una escala diferente, es necesario escalar todas las variables
+
+```
+
+
+```{r}
+# View the firt 3 rows of the data
+head(df, n = 3)
+```
+
+Computamos K-means
+
+```{r}
+library(factoextra)
+# Compute k-means with k = 4
+set.seed(123)
+km.res <- kmeans(df, 3, nstart = 50)
+```
+
+
+```{r}
+# Print the results
+print(km.res)
+```
+
+
+
+```{r}
+aggregate(USArrests, by=list(cluster=km.res$cluster), mean)
+```
+
+
+Analisis de datos: para un analisis de 4 clusters, se observa que el cluster 1 son las ciudades mas peligrosas cuando se compara contra el porcentaje de poblaciòn de cada ciudad.
+
+Las ciudades que se agruparon en el cluster 2 son menos peligrosas.
+
+
+Adicionamos el cluster a los registros
+
+```{r}
+dd <- cbind(USArrests, cluster = km.res$cluster)
+head(dd)
+```
+
+
+
+```{r}
+# Cluster size
+km.res$size
+```
+
+
+
+```{r}
+
+# Cluster means
+km.res$centers
+
+```
+
+Graficamos los clusters
+
+```{r}
+ fviz_cluster(km.res, df[, -5], ellipse.type = "norm")
+```
+
+
+Buscamos el Mejor K
+
+Metodo del codo
+
+```{r}
+# Elbow method
+fviz_nbclust(df, kmeans, method = "wss") +
+    geom_vline(xintercept = 4, linetype = 2)+
+  labs(subtitle = "Elbow method")
+```
+
+
+Gráfico de siluetas
+
+
+```{r}
+# Silhouette method
+fviz_nbclust(df, kmeans, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+```
+
+
+GAP Statistics
+
+```{r}
+# Gap statistic
+# nboot = 50 to keep the function speedy. 
+# recommended value: nboot= 500 for your analysis.
+# Use verbose = FALSE to hide computing progression.
+set.seed(123)
+fviz_nbclust(df, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
+  labs(subtitle = "Gap statistic method")
+```
+
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

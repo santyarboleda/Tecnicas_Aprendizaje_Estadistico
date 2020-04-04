@@ -1,0 +1,749 @@
+---
+title: "Análisis PCA MNIST"
+author: "Juan David Ospina Arango <br> Técnicas en Aprendizaje Estadístico"
+date: "10/02/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+## El conjunto MNIST
+
+La base [MNIST](https://en.wikipedia.org/wiki/MNIST_database) es un conjunto de dígitos manuscritos del 0 al 9. Surge de la necesidad de automatizar el proceso de lectura de códigos postales para la asginación de rutas de reparto.
+
+Los digitos fueron escaneados y preprocesados. La versión utilizada en este documento corresponde a la descargada en el [enlace](https://pjreddie.com/projects/mnist-in-csv/). 
+
+## Carga de la base
+En este documento se utilizará solamente el conjunto de entrenamiento. La base está disponible en CSV donde cada fila es una imagen vectorizada. Es decir que la imagen vista como una matriz se reorganiza en un vector y luego se traspone. A continuación se carga la base CSV de entrenamiento:
+
+```{r}
+mnist_train <- read.table("mnist_train.csv",sep=",",header=FALSE,colClasses = "numeric")
+```
+En mnist_train cada fila corresponde a una imagen con su respectiva etiqueta. Las etiquetas son la primera columna. Las imágenes son originalmente matrices de $28 \times 28$ que se representan en un vector fila de 784 componentes. La base de datos tiene `r dim(mnist_train)[1]` filas y `r dim(mnist_train)[2]` columnas. La primera columna del dataframe representa el dígito. A continuación se muestra el conteo de representantes de cada dígito en la base de datos:
+
+
+```{r}
+table(mnist_train$V1)
+```
+
+Ahora se separan los datos: la primera columna se llamará `train_y` y el resto del dataframe se llamará `train_X`: 
+
+
+```{r}
+train_X<-mnist_train[,-1]
+train_y<-mnist_train[,1]
+```
+
+Para ahorrar espacio en la memoria se elimina el dataframe completo:
+
+```{r}
+rm(mnist_train)
+```
+
+
+<!-- Este código es útil si se quieren leer las imágenes como enteros y así ahorrar espacio en memoria. -->
+<!-- ```{r} -->
+<!--  library(readr) -->
+<!--  mnist_train <- read_csv("mnist_train.csv", -->
+<!--                          col_names = FALSE,col_types = cols(.default = col_integer())) -->
+<!-- ``` -->
+
+
+## Visualización de algunos dígitos
+Se puede visualizar un dígito de `train_X` seleccionando una columna y convirtiéndola en una matriz de $28 \times 28$:
+
+```{r}
+ejemplo_digito<-matrix(as.numeric(train_X[1,]),ncol=28,nrow=28,byrow = TRUE)
+print(ejemplo_digito)
+```
+
+Esta forma de visualizar no es muy eficiente. En lugar de ver la matriz se puede utilizar la función `image()` que representa una matriz como imagen:
+
+```{r}
+image(1:28,1:28,ejemplo_digito)
+```
+
+La imagen anterior no es muy informativa por varias cosas, como por ejemplo: 1) la orientación; 2) el color y 3) la distorsión de los ejes. La función `image()` entiende que el eje x son las filas y el eje y las columnas. Por esto se debe rotar la imagen ([ver enlace])(https://www.r-bloggers.com/creating-an-image-of-a-matrix-in-r-using-image/).
+
+El siguiente código muestra la imagen un poco más trabajada:
+
+```{r}
+par(pty="s")
+image(1:28,1:28,t(ejemplo_digito[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = paste0(c("Esto es un",train_y[1]),collapse = " "))
+grid(28,28)
+```
+
+Resulta conveniente encapsular el código anterior para poder graficar cualquier dígito en la base de datos. El siguiente código muestra una función para graficar cualquier número de la base de entrenamiento:
+
+```{r}
+plot_digit<-function(i,x,y){
+  digito<-matrix(as.numeric(x[i,]),ncol=28,nrow=28,byrow = TRUE)
+  par(pty="s")
+  image(1:28,1:28,t(digito[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+  title(main = paste0(c("Esto es un",y[i]),collapse = " "))
+  grid(28,28)
+}
+```
+
+Ahora se muestra cómo se utiliza la función:
+
+```{r}
+plot_digit(1,x=train_X,y=train_y)
+```
+
+A continuación se muestran algunos dígitos escogidos al azar:
+
+```{r}
+set.seed(012020)
+indices<-sample(1:length(train_y),25) # Se seleccionan 25 dígitos al azar
+par(mfrow=c(3,3),pty="s")
+for (i in indices[1:9]){ # Se grafican solo 9 dígitos
+  plot_digit(i,x=train_X,y=train_y)
+}
+```
+
+Veamos los dígitos seleccinados aleatoriamente como vectores y luego como imagen:
+
+```{r}
+img_vect<-as.matrix(train_X[indices,])
+image(img_vect)
+```
+
+Nuevamente, la imagen anterior no es muy informativa. A continuación se muestra un poco más trabajada:
+
+```{r}
+image(1:25,1:784,img_vect,col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1,axes=FALSE)
+grid(784,25)
+axis(1, at=1:25, labels = train_y[indices],
+     las=1)
+```
+
+## Experimento
+
+El siguiente código muestra un experimento ¿En qué consiste el  experimento?
+
+
+```{r}
+set.seed(0120202)
+ochos<-which(train_y==8)
+unos<-which(train_y==1)
+
+muestra_ochos<-sample(ochos,20)
+muestra_unos<-sample(unos,20)
+
+indices_ochos_unos<-c(muestra_ochos,muestra_unos)
+img_vect_ochos_unos<-as.matrix(train_X[indices_ochos_unos,])
+```
+
+Resultado del experimento:
+
+```{r}
+image(1:length(indices_ochos_unos),1:784,img_vect_ochos_unos,col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1,axes=FALSE)
+grid(784,length(indices_ochos_unos))
+axis(1, at=1:length(indices_ochos_unos), labels = train_y[indices_ochos_unos],
+     las=1)
+```
+
+## ¿Qué muestran las matrices de covarianza?
+
+Las matrices de covarianza pueden ayudar a revelar patrones. Antes de calcularla se procede a normalizar los datos. Cada pixel de cada imagen es un número entre 0 y 255, que representa la intensidad del pixel en una escala de grises. Para normalizar las imágenes se pueden dividir entre 255 y así cada pixel tomará un valor entre 0 y 1:
+
+```{r}
+train_X<-train_X/255
+```
+
+El siguiente código calcula las matrices de covarianza para los "8" y para los "1":
+
+```{r}
+cov_ochos<-cov(train_X[ochos,])
+cov_unos<-cov(train_X[unos,])
+```
+
+```{r paged.print=FALSE}
+par(mfrow=c(1,2))
+image(1:784,1:784,cov_ochos,main="Covarianza de los ochos",ylab = "",xlab = "",las=1,axes=FALSE)
+image(1:784,1:784,cov_unos,main="Covarianza de los unos",ylab = "",xlab = "",las=1,axes=FALSE)
+```
+
+
+La matriz de covarianza muestra dos cosas:
+
+1. Hay pixeles que no son informativos. Estos pixeles tiene desviación estándar cero, luego no se puede calcular la correlación de otros pixeles con los pixeles no informativos
+2. La covarianza entre los pixeles cambia para estos dos dígitos
+
+### Imagen promedio
+
+Las imágenes promedio sirven para entender patrones. El siguiente código muestra el cálculo de los "8" y "1" promedios:
+
+
+```{r}
+# Se calcula el promedio usando las imagenes vectorizadas y luego se convierten en matriz.
+
+img_ocho_promedio_vect<-apply(log(1+train_X[ochos,]),2,mean)
+img_ocho_promedio<-matrix(img_ocho_promedio_vect,ncol=28,nrow=28,byrow = TRUE)
+
+img_uno_promedio_vect<-apply(log(1+train_X[unos,]),2,mean)
+img_uno_promedio<-matrix(img_uno_promedio_vect,ncol=28,nrow=28,byrow = TRUE)
+```
+
+Ahora se muestran dichas imágenes:
+
+```{r}
+par(mfrow=c(1,2),pty="s")
+
+image(1:28,1:28,t(img_ocho_promedio[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Esto es el 8 promedio")
+grid(28,28)
+
+image(1:28,1:28,t(img_uno_promedio[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Esto es el 1 promedio")
+grid(28,28)
+```
+
+### Imagen desviación estándar
+
+Análogamente, la imagen desviación estándar revela patrones de variación (o no variación) interesantes que se pueden usar para descartar información:
+
+```{r}
+img_ocho_sd_vect<-apply(log(1+train_X[ochos,]),2,sd)
+img_ocho_sd<-matrix(img_ocho_sd_vect,ncol=28,nrow=28,byrow = TRUE)
+
+img_uno_sd_vect<-apply(log(1+train_X[unos,]),2,sd)
+img_uno_sd<-matrix(img_uno_sd_vect,ncol=28,nrow=28,byrow = TRUE)
+```
+
+A continuación se muestran las imágenes desviación estándar para los "8" y para los "1":
+
+```{r}
+par(mfrow=c(1,2),pty="s")
+
+image(1:28,1:28,t(img_ocho_sd[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Esto es el 8 sd")
+grid(28,28)
+
+image(1:28,1:28,t(img_uno_sd[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Esto es el 1 sd")
+grid(28,28)
+```
+
+
+
+### Eliminación de la información redundante
+
+Como se puede ver en la imagen desviación estándar, no todos los pixeles son informativos. Pixeles con baja o nula variabilidad no son relevantes en el análisis, pero el tenerlos en cuenta obliga a reservar memoria y capacidad de procesamiento.
+
+Para reducir la información se puede utilizar una máscara, es decir, una imagen binaria que le asigna un cero a los pixeles de baja o nula variabilidad y un uno a los pixeles con variabilidad.
+
+A continuación se extrae una muestra de 2000 ochos ("8") y 2000 unos ("1"):
+
+```{r}
+set.seed(0120202)
+ochos<-which(train_y==8)
+unos<-which(train_y==1)
+
+muestra_ochos<-sample(ochos,2000)
+muestra_unos<-sample(unos,2000)
+
+indices_ochos_unos<-c(muestra_ochos,muestra_unos)
+img_vect_ochos_unos<-as.matrix(train_X[indices_ochos_unos,])
+```
+
+Ahora se calcula la desviación estándar de cada pixel de esta muestra:
+
+```{r}
+img_vect_sd_ochos_unos<-apply(img_vect_ochos_unos,2,sd)
+```
+
+El histograma puede ayudar a visualizar cómo se distribuyen los niveles de variabilidad:
+
+```{r}
+hist(img_vect_sd_ochos_unos,las=1,main="Histograma de la desviación estándar",xlab = "desviación estándar", ylab="Frecuencia")
+```
+
+
+Ahora se procede a crear una máscara donde los puntos con desviación estándar inferior a 0.1 serán ceros y los otros unos:
+
+```{r}
+img_vect_mask_sd_ochos_unos<-ifelse(img_vect_sd_ochos_unos<0.1,0,1)
+
+img_mask_sd_ochos_unos<-matrix(img_vect_mask_sd_ochos_unos,ncol=28,nrow=28,byrow = TRUE)
+
+par(pty="s")
+image(1:28,1:28,t(img_mask_sd_ochos_unos[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Máscara")
+grid(28,28)
+```
+
+¿Cuántos pixeles se han descartado?
+
+```{r}
+table(img_vect_mask_sd_ochos_unos)
+```
+
+Esto quiere decir que se puede descartar con este criterio más de la mitad de los pixeles (variables).
+
+Para descartar los pixeles no informativos tomamos los índices de la máscara donde los valores son uno:
+
+```{r}
+indices_mask<-which(img_vect_mask_sd_ochos_unos==1)
+```
+
+Ahora tomemos los datos que corresponden únicamente a estos pixeles:
+
+```{r}
+img_vect_ochos_unos_mask<-img_vect_ochos_unos[,indices_mask]
+```
+
+Si se compara el conjunto original con el conjunto reducido se observa que:
+
+1- La muestra de 4000 imágenes (2000 unos y 2000 ochos) original tenía dimensiones `r dim(img_vect_ochos_unos)`
+
+2- La muestra reducida con la máscara tiene dimensiones `r dim(img_vect_ochos_unos_mask)`
+
+
+
+## Ejercicio de clasificación
+
+Se diseñará un clasificador para clasificar los dígitos "1" y "8". Esto no debería ser tan difícil, ya que son figuras geométricas muy diferentes. Dicho clasificador se implementará en el espacio reducido por la máscara calculada anteriormente.
+
+El primer paso será escalar y centrar los datos:
+
+```{r}
+img_vect_ochos_unos_mask_scale<-scale(img_vect_ochos_unos_mask,center=TRUE,scale = TRUE)
+```
+
+Idealmente, las transformaciones sobre los datos deben ser reversibles. Para poder reversar el escalamiento y el centrado se deben guardar la media y la desviación estándar de cada columna. Esto puede hacerse así:
+
+
+
+```{r}
+img_vect_ochos_unos_mask_media<-attr(img_vect_ochos_unos_mask_scale,"scaled:center")
+img_vect_ochos_unos_mask_desvs<-attr(img_vect_ochos_unos_mask_scale,"scaled:scale")
+```
+
+Los datos escalados corresponden a los pixeles de las cuatro mil imágenes filtrados por la máscara y luego centrados y normalizados por su desviación estándar.
+
+El clasificador propuesto se construirá a partir del análisis de componentes principales. Para ello se puede calcular primero la matriz de covarianzas. Como los datos están escalados usando la desviación estándar, la matriz de covarianzas coincide con la matriz de correlación:
+
+```{r}
+Sigma_unos_ochos<-cov(img_vect_ochos_unos_mask_scale)
+```
+
+¿Qué muestra la matriz de covarianzas?
+
+```{r}
+par(pty="s")
+image(1:355,1:355,Sigma_unos_ochos[355:1,],main="",ylab = "",xlab = "",las=1)
+title(main = "Covarianzas (Correlaciones)")
+# grid(355,355)
+```
+
+Para hacer el análisis de componentes principales se usará la función `princomp()`:
+
+```{r}
+PCA_unos_ochos<-princomp(img_vect_ochos_unos_mask_scale)
+```
+
+Ahora se muestra el comportamiento de la función `plot()` sobre un objeto de la clase `princomp`:
+
+```{r}
+plot(PCA_unos_ochos)
+```
+
+El gráfico anterior muestra la varianza explicada por las primeras 10 componentes principales. Ahora se calcula el porcentaje de varianza explicado por las primeras $m$ componentes principales. El objeto `princomp` contiene las desviaciones estándar de las componentes principales y al elevarlas al cuadrado se obtienen las varianzas de las componentes principales, así:
+
+```{r}
+prop_expl_var<-cumsum((PCA_unos_ochos$sdev)^2)/sum((PCA_unos_ochos$sdev)^2)
+
+npc_opt<-which.min(abs(prop_expl_var-0.8)) # Así se encuentra el número de componentes principales que explican aproximadamente el 80% de la variabilidad
+```
+
+```{r}
+# npc<-20
+plot(prop_expl_var,type="h",las=1,xlim=c(1,355),ylab="Proporción de varianza explicada",xlab="m")
+points(npc_opt,prop_expl_var[npc_opt],col="red",lwd=2)
+segments(x0=0,y0=prop_expl_var[npc_opt],x1=npc_opt,y1=prop_expl_var[npc_opt],col="red",lwd=2)
+segments(x0=npc_opt,y0=0,x1=npc_opt,y1=prop_expl_var[npc_opt],col="red",lwd=2)
+```
+
+
+Ahora, se representarán los datos usando las primeras `npc_opt` componentes principales.
+
+```{r}
+D_npc_opt<-PCA_unos_ochos$loadings[,1:npc_opt] # Primeros vectores propios
+img_vect_ochos_unos_mask_scale_PCA<-PCA_unos_ochos$scores[,1:npc_opt]
+```
+
+El objeto `img_vect_ochos_unos_mask_scale_PCA` contiene la representación de los datos originales usando las primeras `npc_opt` componentes principales.
+
+A continuación se muestra los gráficos de dispersión por pares de las primeras cinco componentes principales para los 2000 unos ("1") (negro) y los 2000 ochos ("8") (rojo):
+
+
+```{r}
+col<-c(rep(1,2000),rep(2,2000))
+pairs(img_vect_ochos_unos_mask_scale_PCA[,1:5],col=col,lower.panel = NULL)
+```
+
+Ahora se reconstruyen como imágenes los primeros 6 vectores propios. Primero se reserva una matriz cuyas filas serán los vectores propios. Originalmente, cada imagen tiene 784 pixeles, de los cuales se descartaron 429. Las filas de la matriz tendrán 784 entradas, pero 429 serán siempre cero. A las componentes no cero se les asignan los vectores propios:
+
+
+```{r}
+comp_primeras6<-matrix(0,ncol=784,nrow = 6)
+comp_primeras6[,indices_mask]<-t(D_npc_opt[,1:6])
+```
+
+Ahora se crean las seis imagenes, una para cada uno de los seis primeros vectores propios:
+
+```{r}
+comp1_img<-matrix(comp_primeras6[1,],ncol=28,nrow=28,byrow = TRUE)
+comp2_img<-matrix(comp_primeras6[2,],ncol=28,nrow=28,byrow = TRUE)
+comp3_img<-matrix(comp_primeras6[3,],ncol=28,nrow=28,byrow = TRUE)
+comp4_img<-matrix(comp_primeras6[4,],ncol=28,nrow=28,byrow = TRUE)
+comp5_img<-matrix(comp_primeras6[5,],ncol=28,nrow=28,byrow = TRUE)
+comp6_img<-matrix(comp_primeras6[6,],ncol=28,nrow=28,byrow = TRUE)
+
+par(mfrow=c(2,3),pty="s")
+image(1:28,1:28,t(comp1_img[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Comp1")
+grid(28,28)
+
+image(1:28,1:28,t(comp2_img[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Comp2")
+grid(28,28)
+
+image(1:28,1:28,t(comp3_img[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Comp3")
+grid(28,28)
+
+image(1:28,1:28,t(comp4_img[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Comp4")
+grid(28,28)
+
+image(1:28,1:28,t(comp5_img[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Comp5")
+grid(28,28)
+
+image(1:28,1:28,t(comp6_img[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Comp6")
+grid(28,28)
+```
+
+Ahora se reconstruirán un "8" y un "1" usando las seis primeras componentes principales:
+
+```{r}
+img8_rec<-PCA_unos_ochos$scores[1,1]*comp1_img+PCA_unos_ochos$scores[1,2]*comp2_img+PCA_unos_ochos$scores[1,3]*comp3_img+PCA_unos_ochos$scores[1,4]*comp4_img+PCA_unos_ochos$scores[1,5]*comp5_img+PCA_unos_ochos$scores[1,6]*comp6_img
+
+img1_rec<-PCA_unos_ochos$scores[2001,1]*comp1_img+PCA_unos_ochos$scores[2001,2]*comp2_img+PCA_unos_ochos$scores[2001,3]*comp3_img+PCA_unos_ochos$scores[2001,4]*comp4_img+PCA_unos_ochos$scores[2001,5]*comp5_img+PCA_unos_ochos$scores[2001,6]*comp6_img
+```
+
+```{r}
+par(mfrow=c(1,2),pty="s")
+image(1:28,1:28,t(img1_rec[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "'8' reconstruido por 6 PC")
+grid(28,28)
+
+image(1:28,1:28,t(img8_rec[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "'1' reconstruido por 6 PC")
+grid(28,28)
+```
+
+Ahora se muestra una manera de automatizar este proceso creando la función `img_reconstruct()`:
+
+
+```{r}
+img_reconstruct<-function(i,scores,loadings,npc,img_media,img_sd,indices_mask,as_image=TRUE){
+  vectores_propios<-t(loadings)
+  IMG_r<-apply(scores[i,1:npc]*vectores_propios[1:npc,],2,sum)
+  IMG_r<-IMG_r*img_sd+img_media
+  IMG_vec<-matrix(0,ncol=784,nrow = 1)
+  IMG_vec[,indices_mask]<-IMG_r
+  if(as_image){
+    return(matrix(IMG_vec,ncol=28,nrow=28,byrow = TRUE))
+  }else{
+    return(IMG_vec)
+  }
+}
+```
+
+El siguiente código muestra la función `img_reconstruct()` en acción:
+
+```{r}
+ocho_ex_39<-img_reconstruct(i=1,scores=PCA_unos_ochos$scores,
+                loadings=PCA_unos_ochos$loadings,
+                npc=npc_opt,
+                img_media=img_vect_ochos_unos_mask_media,
+                img_sd=img_vect_ochos_unos_mask_desvs,
+                indices_mask=indices_mask,
+                as_image=TRUE)
+
+ocho_ex_all<-img_reconstruct(i=1,scores=PCA_unos_ochos$scores,
+                loadings=PCA_unos_ochos$loadings,
+                npc=355,
+                img_media=img_vect_ochos_unos_mask_media,
+                img_sd=img_vect_ochos_unos_mask_desvs,
+                indices_mask=indices_mask,
+                as_image=TRUE)
+```
+
+
+Ahora se grafica el resultado de la salida de `img_reconstruct()`:
+
+```{r}
+par(mfrow=c(1,3),pty="s")
+
+image(1:28,1:28,t(ocho_ex_39[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "'8' reconstruido por 39 PC")
+grid(28,28)
+
+image(1:28,1:28,t(ocho_ex_all[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "'8' reconstruido por 355 PC")
+grid(28,28)
+
+plot_digit(muestra_ochos[1],train_X,train_y)
+```
+
+### Clasificador
+
+Para hacer el clasificador se explora la capacidad discriminatoria de la primera componente principal. Una forma de hacerlo es con el boxplot: 
+
+```{r}
+etiquetas<-c(rep(8,2000),rep(1,2000))
+boxplot(PCA_unos_ochos$scores[,1]~etiquetas,las=1,ylab="Z1")
+```
+
+El histograma también puede usarse como se muestra a continuación:
+
+```{r}
+par(mfrow=c(2,1))
+hist(PCA_unos_ochos$scores[1:2000,1],las=1,xlab="Z1",main="Distribución de Z1 para los 8",xlim = c(-20,40))
+hist(PCA_unos_ochos$scores[2001:4000,1],las=1,xlab="Z1",main="Distribución de Z1 para los 1",xlim = c(-20,40))
+```
+
+
+Los gráficos anteriores permiten definir un clasificador que asigne "8" cuando la primera componente sea positiva y "1" cuando sea negativa. A continuación se muestra la matriz de confusión de dicho clasificador:
+
+```{r}
+clase_pred<-ifelse(PCA_unos_ochos$scores[,1]<=0,1,8)
+(tabla_conf<-table(clase_pred,etiquetas))
+```
+
+Ahora se calculará la tasa de clasificación incorrecta:
+
+```{r}
+(tasa_clas_incorrecta<-1-sum(diag(tabla_conf))/4000)
+```
+
+Esto quiere decir que con los datos utilizados aproximadamente el 93% de los dígitos son clasificados correctamente.
+
+Ahora se muestra cómo se comporta el clasificador sobre otra muestra. El primer paso será generar una muestra de validación excluyendo a los dígitos usados en el entrenamiento:
+
+```{r}
+set.seed(0208202)
+ochos_v<-ochos[-muestra_ochos]
+unos_v<-unos[-muestra_unos]
+
+muestra_ochos_v<-sample(ochos_v,2000)
+muestra_unos_v<-sample(unos_v,2000)
+
+indices_ochos_unos_v<-c(muestra_ochos_v,muestra_unos_v)
+img_vect_ochos_unos_v<-as.matrix(train_X[indices_ochos_unos_v,indices_mask]) # solo se extraen los pixeles informativos
+```
+
+El objeto `img_vect_ochos_unos_v`, que se usará para validar tiene el mismo tamaño del objeto usado en el entramiento. Ahora se le restará la media y se dividirá por la desviación estándar encontrados previamente:
+
+```{r}
+img_vect_ochos_unos_v_scaled<-scale(img_vect_ochos_unos_v,center=img_vect_ochos_unos_mask_media,scale=img_vect_ochos_unos_mask_desvs)
+```
+
+Ahora se proyectan las imagenes de validación usando el primer vector propio:
+
+```{r}
+T1<-PCA_unos_ochos$loadings[,1]
+datos_v_pc1<-img_vect_ochos_unos_v_scaled%*%T1
+```
+
+A continuación se aplica la regla de clasificación identificada anteriormente y se encuentra la matriz de confusión de validación:
+
+```{r}
+clas_pred_v<-ifelse(datos_v_pc1<=0,1,8)
+(tabla_conf_v<-table(clas_pred_v,etiquetas))
+```
+
+La tasa de clasificación incorrecta correspondiente se calcula a continuación:
+
+```{r}
+(tasa_clas_incorrecta_v<-1-sum(diag(tabla_conf_v))/4000)
+```
+
+Como las tasas de entrenamiento y de clasificación son aproximadamente iguales se concluye que no hay sobreentrenamiento.
+
+# Generación de números sintéticos
+
+Esta sección ilustra el principio de generación de información sintética. Los vectores propios constituyen un diccionario que permiten expresar los "1" de la base de entrenamiento. Los vectores propios, multiplicados por su respectiva componente principal permiten reconstruir cualquier elemento de la base de datos.
+
+Si se pudieran generar aleatoriamente componentes principales, entonces se podrían multiplicar por los vectores propios y obtener números "1" sintéticos (que nadie nunca escribió).
+
+*Objetivo:* Generar "1" sintéticos. 
+
+El primer paso será construir una base que contenga solo unos y encontrar una máscara para descartar luego los pixeles no informativos:
+
+```{r}
+img_uno_train<-train_X[unos,]
+img_uno_sd_vec<-apply(img_uno_train,2,sd)
+mascara_unos<-ifelse(img_uno_sd_vec<=0.1,0,1)
+indices_mask_unos<-which(mascara_unos==1)
+```
+
+A continuación se descartan los pixeles no informativos y luego se centran y escalan los datos que se mantienen en el análisis:
+
+```{r}
+img_uno_vec_red<-img_uno_train[,indices_mask_unos]
+img_uno_vec_red_scaled<-scale(img_uno_vec_red,center = TRUE,scale = TRUE)
+img_uno_vec_red_scaled_media<-attr(img_uno_vec_red_scaled,"scaled:center")
+img_uno_vec_red_scaled_desvs<-attr(img_uno_vec_red_scaled,"scaled:scale")
+```
+
+Ahora se aplica el análisis en componentes principales:
+
+```{r}
+PCA_unos<-princomp(img_uno_vec_red_scaled)
+```
+
+A continuación se analiza la variabilidad explicada por las primeras $m$ componentes principales:
+```{r}
+prop_expl_var<-cumsum((PCA_unos$sdev)^2)/sum((PCA_unos$sdev)^2)
+
+npc_opt<-which.min(abs(prop_expl_var-0.8)) # Así se encuentra el número de componentes principales que explican aproximadamente el 80% de la variabilidad
+
+# npc<-20
+plot(prop_expl_var,type="h",las=1,xlim=c(1,355),ylab="Proporción de varianza explicada",xlab="m")
+points(npc_opt,prop_expl_var[npc_opt],col="red",lwd=2)
+segments(x0=0,y0=prop_expl_var[npc_opt],x1=npc_opt,y1=prop_expl_var[npc_opt],col="red",lwd=2)
+segments(x0=npc_opt,y0=0,x1=npc_opt,y1=prop_expl_var[npc_opt],col="red",lwd=2)
+```
+
+A continuación se muestra un "1" reconstruido usando las primeras componentes principales:
+
+```{r}
+npc<-npc_opt
+uno_reconstruido<-img_reconstruct(i=10,scores=PCA_unos$scores,
+                loadings=PCA_unos$loadings,
+                npc=npc,
+                img_media=img_uno_vec_red_scaled_media,
+                img_sd=img_uno_vec_red_scaled_desvs,
+                indices_mask=indices_mask_unos,
+                as_image=TRUE)
+
+par(mfrow=c(1,1),pty="s")
+
+image(1:28,1:28,t(uno_reconstruido[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = paste0(c("'1' reconstruido por ",npc," PC"),collapse = ""))
+grid(28,28)
+```
+
+## Simulando a partir de una distribución normal multivariada
+
+El reto consiste en generar aleatoriamente valores consistentes para las componentes principales con las que se reconstruirán luego los  "1" sintéticos.
+
+La primera aproximación será generar las componentes principales de una $N(0,\Sigma)$, donde $\Sigma$ es una matriz diagonal cuyas entradas no nulas son los valores propios encontrados con la función `princomp()`, es decir `PCA_unos$sdev^2`.
+
+Primero se carga la librería `mvtnorm` que contiene la función `rmvnorm()` útil para simular muestras de una distribución normal multivariada:
+
+```{r}
+library(mvtnorm)
+```
+
+A continuación se generan 2000 muestras de componentes principales:
+
+```{r}
+set.seed(08022020)
+unos_sinteticos_scores<-rmvnorm(2000,mean=rep(0,216),sigma = diag(PCA_unos$sdev^2))
+```
+
+Ahora se reconstruye una de las muestras simuladas:
+
+```{r}
+npc<-216
+uno_simulado<-img_reconstruct(i=14,scores=unos_sinteticos_scores,
+                loadings=PCA_unos$loadings,
+                npc=npc,
+                img_media=img_uno_vec_red_scaled_media,
+                img_sd=img_uno_vec_red_scaled_desvs,
+                indices_mask=indices_mask_unos,
+                as_image=TRUE)
+```
+
+A continuación se muestra el resultado:
+
+```{r}
+par(mfrow=c(1,1),pty="s")
+
+image(1:28,1:28,t(uno_simulado[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = paste0(c("'1' reconstruido por ",npc," PC"),collapse = ""))
+grid(28,28)
+```
+
+Esta reconstrucción no parece muy exitosa. La razón está en la distribución utilizada. En el caso de la distribución normal, correlación cero implica independencia. Pero las componentes principales no necesariamente son independientes por ser incorrelacionadas. A continuación se muestra el diagrama de dispersión por pares para las primeras cinco componentes principales:
+
+```{r}
+pairs(PCA_unos$scores[,1:5],lower.panel = NULL)
+```
+
+La gráfica anterior muestra que, aunque incorrelacionadas, las componentes principales no son indepedientes.
+
+El gráfico de dispersión por pares de las primeras cinco componentes principales simuladas se muestra a continuación:
+
+```{r}
+pairs(unos_sinteticos_scores[,1:5],lower.panel = NULL)
+```
+
+
+## Simulando a partir de una distribución multivariada ajustada no paramétricamente
+
+En la estadística no paramétrica usualmente se renuncia a conocer una expresión funcional para la distribución de los datos o para una función de regresión. En lugar de ello, se asume que mediante aproximaciones, por ejemplo de Taylor, dicha forma funcional se puede calcular con precisión razonable (que depende de los datos). 
+
+El paquete `rvinecopulib` permite ajustar una distribución no paramétrica a un conjunto de datos de alta dimensión: 
+
+```{r}
+library(rvinecopulib)
+```
+
+La función `vine()` permite hacer el ajuste de la distribución no paramétrica de las primeras componentes principales:
+
+```{r}
+ajuste_dist_pca<-vine(PCA_unos$scores[,1:npc_opt])
+```
+El objeto `ajuste_dist_pca` es una distribución de probabilidad multivariada de la cual se pueden simular muestras. A continuación se simulan 2000 muestras y se presenta el diagrama de dispersión por pares de las primeras cinco componentes principales simuladas con `vine()`:
+
+```{r}
+unos_sinteticos_scores_vine<-rvine(5000,ajuste_dist_pca)
+pairs(unos_sinteticos_scores_vine[,1:5],lower.panel = NULL)
+```
+
+
+Ahora se muestra un "1" sintético reconstruido:
+
+```{r}
+npc<-npc_opt
+uno_reconstruido<-img_reconstruct(i=5,scores=unos_sinteticos_scores_vine,
+                loadings=PCA_unos$loadings,
+                npc=npc,
+                img_media=img_uno_vec_red_scaled_media,
+                img_sd=img_uno_vec_red_scaled_desvs,
+                indices_mask=indices_mask_unos,
+                as_image=TRUE)
+
+par(mfrow=c(1,1),pty="s")
+
+image(1:28,1:28,t(uno_reconstruido[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = paste0(c("'1' reconstruido por ",npc," PC"),collapse = ""))
+grid(28,28)
+```
+
+Una recomendación a la hora de graficar es utilizar menos escalas de color.
+
+
+<font size="6">Fin</font>

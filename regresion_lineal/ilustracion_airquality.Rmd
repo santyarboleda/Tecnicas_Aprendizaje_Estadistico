@@ -1,0 +1,380 @@
+---
+title: "Introduccción al aprendizaje estadístico <br> Ilustración regresión lineal: airquality"
+author: "Juan David Ospina Arango <br> II Congreso Colombiano de Estadística"
+date: "Semestre 2019-02"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+Sys.setlocale("LC_TIME","Spanish")
+```
+
+
+# Ilustración de la regresión lineal con el conjunto de datos airquality
+
+## Carga de los datos
+Los datos están incluidos en la instalación de R. El comando *data()* pone el conjunto de datos en la memoria:
+
+```{r}
+data("airquality")
+```
+
+El comando *summary()* muestra algunas medidas descriptivas de las variables:
+
+```{r}
+summary(airquality)
+```
+ El conjunto de datos tiene un tamaño de:
+```{r}
+dim(airquality)
+```
+
+Se tienen 153 observaciones, pero la variable respuesta tiene 37 valores faltantes. El comando *lm()*, que ejecuta la regresión lineal, excluirá todos los registros con valores faltantes. El analista deberá decidir si imputa los datos faltantes o si continua con un conjunto de datos de tamaño reducido. 
+
+## Análisis exploratorio
+
+Primero graficaremos la serie de datos:
+
+```{r}
+with(airquality,
+     plot(Ozone,type="h",las=1))
+```
+
+Para ver mejor los datos crearemos el vector de fechas:
+
+```{r}
+fechas<-apply(cbind(1973,airquality$Month,airquality$Day),1,paste,collapse="-")
+fechas<-as.Date(fechas,"%Y-%m-%d")
+```
+
+```{r}
+plot(fechas,airquality$Ozone,type="h",las=1)
+```
+
+De la gráfica puede verse que junio es el mes con mas valores faltantes. Veamos cómo se distribuyen los valores faltantes por mes:
+
+```{r}
+aggregate(is.na(airquality$Ozone)~airquality$Month,FUN=sum)
+```
+
+Extraigamos ahora de la fecha los nombres del mes y del día de la semana;
+```{r}
+fechas_mes<-months(fechas)
+fechas_dia<-weekdays(fechas)
+```
+
+Desafortunadamente, los vectores anteriores no contienen información sobre el orden natural de sus valores. Esta información debe agregarse manualmente así:
+
+```{r}
+echas_mes<-factor(fechas_mes,
+                      levels=c("May","June","July",
+                               "August","September"),ordered = TRUE)
+fechas_dia<-factor(fechas_dia,levels=c("Monday","Tuesday","Wednesday",
+                                      "Thursday","Friday","Saturday",                                     "Sunday"),,ordered = TRUE)
+
+# fechas_mes<-factor(fechas_mes,
+#                       levels=c("mayo","junio","julio",
+#                                "agosto","septiembre"))
+# fechas_dia<-factor(fechas_dia,levels=c("lunes","martes","miércoles",
+#                                       "jueves","viernes","sábado",
+#                                       "domingo"))
+```
+
+Ahora puede verse mejor la distribución de los datos faltantes. Para los meses se tiene:
+```{r}
+aggregate(is.na(airquality$Ozone)~fechas_mes,FUN=sum)
+```
+Y para los días de la semana se tiene:
+```{r}
+aggregate(is.na(airquality$Ozone)~fechas_dia,FUN=sum)
+```
+
+Otra forma de explorar la relación de la contaminación con la fecha es con el diagrama de caja y bigotes:
+
+```{r}
+boxplot(airquality$Ozone~fechas_mes, ylab="Ozono  [ppb]",las=1)
+```
+
+```{r}
+boxplot(airquality$Ozone~fechas_dia, ylab="Ozono [ppb]",las=1)
+```
+
+En las gráficas anteriores se puede apreciar lo siguiente:
+
+* Junio es el mes con menores niveles de ozono y también el mes de más valores faltantes. Si se excluyeran todas las observaciones de junio se podría introducir un sesgo importante al modelo.
+* Hay mayor variabilidad en la variable ozono respecto a la variable mes que respecto a la variable día de la semana. En particular se observa que los meses de julio y agosto presentan los mayores valores. Estos meses son los de mayores temperaturas. Veamoslo:
+
+```{r}
+boxplot(airquality$Temp~fechas_mes, ylab="Temperatura [°F]")
+```
+
+Veamos lo que ocurre para la radiación solar:
+
+```{r}
+boxplot(airquality$Solar.R~fechas_mes, ylab="Radiación solar [lang]", las=1)
+```
+
+
+
+
+Veamos qué pasa cuando pasamos a la escala logarítmica:
+
+```{r}
+par(mfrow=c(2,2))
+boxplot(airquality$Ozone~fechas_mes,ylab="Ozono (ppb)")
+boxplot(airquality$Ozone~fechas_mes,log="y",ylab="ln Ozono (ppb)")
+boxplot(airquality$Ozone~fechas_dia,ylab="Ozono (ppb)")
+boxplot(airquality$Ozone~fechas_dia,log="y",ylab="ln Ozono (ppb)")
+```
+
+Hasta este punto la transformación logarítmica no resulta ser muy útil. Más adelante se verá su utilidad.
+
+### Gráfico de dispersión por pares
+Ahora se obtendrá el gráfico de dispersión por pares. Antes de obtenerla definiremos la función *panel.cor()*, que escribirá la correlación entre los distintos pares de variables:
+
+```{r}
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y,use="na.or.complete"))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+pairs(airquality[,1:4], lower.panel = panel.smooth, upper.panel = panel.cor)
+
+```
+
+Obtengamos el mismo gráfico pero poniendo la variable Ozone en escala logarítmica (note los cambios en la función *panel.cor()* para visualizar correctamente el cambio de escala):
+```{r}
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    if(par("xlog")){x<-log(x)}
+    if(par("ylog")){y<-log(y)}
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y,use="na.or.complete"))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    pos_x<-ifelse(par("xlog"),4,0.5)
+    pos_y<-ifelse(par("ylog"),4,0.5)
+    text(pos_x,pos_y, txt, cex = cex.cor * r)
+}
+pairs(airquality[,1:4], lower.panel = panel.smooth, upper.panel = panel.cor,log = c(1,4))
+```
+
+
+# Estimación de un modelo de regresión lineal
+
+## Estimación con *lm()*
+
+Estimaremos un modelo logarítmico utilizando la función *lm()*:
+```{r}
+modelo<-lm(I(log(Ozone))~Wind+Solar.R+I(Solar.R^2)+Temp,data=airquality)
+```
+
+Veamos el desempeño del modelo:
+```{r}
+summary(modelo)
+```
+
+
+
+Ahora observemos los diferentes gráficos diangósticos del modelo:
+```{r}
+par(mfrow=c(2,2))
+plot(modelo,which=1)
+plot(modelo,which=3)
+plot(modelo,which=4)
+plot(modelo,which=5)
+```
+
+
+## Estimación "manual"
+En esta sección se presenta la estimación del modelo anterior utilizando la [ factorización matricial QR](https://en.wikipedia.org/wiki/QR_decomposition) ([enlace útil](http://genomicsclass.github.io/book/pages/qr_and_regression.html)).
+
+En lo que sigue asumimos que el modelo de regresión lineal se escribe de forma matricial como $Y=X\beta+\varepsilon$, donde $Y$ es un vector de $n\times 1$, $X$ es una matriz de datos de dimensión $n \times p$, $\beta$ es un vector de coeficientes de dimensión $p\times 1$ y $\varepsilon$ es un vector de errores de dimensión $n\times 1$ de media $0 \times 1_{n}$,  dispersión $\Sigma=\sigma^2 I_{n\times n}$.
+
+El estimador del vectro de coeficientes se puede obtener como $\hat \beta = (X^TX)^{-1}X^TY$, pero también como el vector que satisface $X^TX \beta=X^TY$.
+
+Construyamos el vector $Y$ y la matriz de datos $X$:
+```{r}
+Y<-log(airquality$Ozone)
+X0<-rep(1,length(Y))
+X1<-airquality$Wind
+X2<-airquality$Solar.R
+X3<-airquality$Solar.R^2
+X4<-airquality$Temp
+X<-as.matrix(cbind(X0,X1,X2,X3,X4))
+Y<-as.matrix(Y,nrow=length(Y),ncol=1)
+```
+
+Para estimar el modelo es necesario eliminar los valores faltantes. Podemos utilizar el siguiente código para encontrarlos:
+
+```{r}
+filas_con_NA<-which(is.na(apply(cbind(X,Y),1,sum)))
+```
+
+Ahora se retiran los valores faltantes:
+
+```{r}
+Y<-Y[-filas_con_NA,1]
+X<-X[-filas_con_NA,]
+```
+
+Para estimar $\beta$ primero se calculará $(X^TX)^{-1}X^T$: 
+```{r}
+X_g<-solve(t(X)%*%X)%*%t(X)
+```
+
+Ahora se obtienen los coeficientes estimados:
+```{r}
+b<-X_g%*%Y
+```
+
+La matriz de proyección $H$ se define como $H=X(X^TX)^{-1}X^T$ y se calcula así:
+```{r}
+H<-X%*%solve(t(X)%*%X)%*%t(X)
+```
+
+Utilizando la matriz $H$ se puede calcular el vector de residuales sin utilizar los coeficientes, así:
+```{r}
+I_nn<-diag(1,nrow=length(Y))
+r<-(I_nn-H)%*%Y
+```
+
+Lo anterior permite tener un estimador de $\sigma^2$, así:
+```{r}
+s2<-t(r)%*%r/(length(Y)-4-1)
+s<-sqrt(s2)
+print(s)
+```
+
+
+### Con la descomposición QR
+Si se aplica la factorización QR sobre $X$, entonces ésta puede escribirse como $X=QR_1$, con $Q$ [matriz ortogonal](https://en.wikipedia.org/wiki/Orthogonal_matrix) y $R_1=[R^T \ 0_{(n-p)\times p}^T]^T$, con $R$ matriz triangular superior. Esta descomposicón se obtiene con la función *qr()*:
+
+```{r}
+QR_des<-qr(X)
+```
+
+Ahora se obtienen las matrices $Q$ y $R$:
+```{r}
+Q<-qr.Q(QR_des)
+R<-qr.R(QR_des)
+```
+
+La matriz $Q$ se puede visualizar como imagen así:
+```{r}
+image(t(Q),main="Matriz Q",axes=FALSE)
+```
+
+La matriz $R$ de dimensión $p\times p$ se visualiza simplemente con *print()*:
+
+```{r}
+print(R)
+```
+
+Para estimar $\beta$ recordemos que este satisface $X^TX \beta=X^TY$. Pero $X^TX=R^TR$, así que primero puede resolverse por sustitución el sistema $R^Tz=X^TY$ para $z$ y luego se resuelve por sustitución el sistema $R\beta=z$ para $\beta$.
+
+Obtengamos $X^TY$:
+
+```{r}
+XY<-t(X)%*%Y
+print(XY)
+```
+Ahora obtengamos $z$ por sustitución utilizando la función *backsolve()* con el comando upper.tri=FALSE (ya que $R^T$ es una matriz triangular inferior):
+
+```{r}
+z<-backsolve(t(R),XY,upper.tri = FALSE)
+print(z)
+```
+
+Finalmente obtengamos $\beta$ por sustitución utilizando nuevamente la función *backsolve()*:
+
+```{r}
+beta<-backsolve(R,z)
+print(beta)
+```
+
+Comparemos los coeficientes obtenidos de las tres maneras:
+
+```{r}
+cbind(coefficients((modelo)),b,beta)
+```
+
+
+Otra manera rápida de utilizar la factorización QR para resolver un modelo lineal es resolver $R\beta=(Q^TY)_{n}$ para $\beta$, donde $(Q^TY)_{p}$ denota las primeras $p$ entradas del vector $Q^TY$. Utilizando esta fórmula se tiene:
+
+```{r}
+beta_2<-backsolve(R,(t(Q)%*%Y)[1:5])
+print(beta_2)
+```
+
+Para los errores estándar se tiene que $\hat {Cov}(\hat \beta)=\hat{\sigma}^2(X^TX)^{-1}$. Pero $(X^TX)^{-1}=(R^TQ^TQR)^{-1}=(R^TR)^{-1}=R^{-1}(R^T)^{-1}$.
+
+Ahora, como $R$ es una matriz triangular, su inversa se puede obtener por sustitución del sistema $Rx=u$, para $u$, donde $u$ toma los valores $e_1=(1 \ 0 \ \ldots \ 0)^T$, $e_2=(0 \ 1 \ \ldots \ 0)^T$, $e_p=(0 \ 0 \ \ldots \ 1)^T$. Para cada vector $e_i$ se obtiene el respectivo valor de $x$ que es la $i$-ésima columna de $R^{-1}$ ([ver enlace](https://math.stackexchange.com/questions/1143214/method-to-find-the-inverse-of-any-lower-triangular-matrix)). Así se tiene:
+
+
+```{r}
+e1<-c(1,0,0,0,0)
+e2<-c(0,1,0,0,0)
+e3<-c(0,0,1,0,0)
+e4<-c(0,0,0,1,0)
+e5<-c(0,0,0,0,1)
+r_1<-backsolve(R,e1)
+r_2<-backsolve(R,e2)
+r_3<-backsolve(R,e3)
+r_4<-backsolve(R,e4)
+r_5<-backsolve(R,e5)
+```
+
+Luego $R^{-1}$ se obtiene concatenando los vectores r_i así:
+
+```{r}
+r_inv<-as.matrix(cbind(r_1,r_2,r_3,r_4,r_5))
+```
+
+Veamos que r_inv es en efecto $R^{-1}$:
+
+```{r}
+R%*%r_inv
+```
+
+Podemos observar que algunos elementos por fuera de la diagonal no son exactamente cero. Esto se llama *error de redondeo* y puede tener implicaciones en los resultados finales de la estimación. El no invertir la matrix $R$ sin embargo, representa una eficiencia importante en términos de tiempo.
+
+Como $(R^T)^{-1}=(R^{-1})^{T}$ ya podemos entonces calcular $(X^TX)^{-1}$:
+
+```{r}
+XTX_inv<-r_inv%*%t(r_inv)
+print(XTX_inv)
+```
+
+Finalmente la matriz de covariazas estimada de los coeficientes es:
+
+```{r}
+cov_b<-as.numeric(s2)*XTX_inv
+print(cov_b)
+```
+
+Comparemos el resultado obtenido con la función $vcov$ que extrae la matriz de dispersión estimada de los coeficientes:
+
+```{r}
+vcov(modelo)
+```
+
+Para completar el ejercicio simplemente calcularemos los estadísticos t y los respectivos valores p:
+
+```{r}
+gl<-dim(X)[1]-4-1 #grados de libertad
+T_estadisticos<-b/sqrt(diag(cov_b))
+valores_p<-2*pt(-abs(T_estadisticos),gl)
+print(cbind(T_estadisticos,valores_p))
+```
+
+

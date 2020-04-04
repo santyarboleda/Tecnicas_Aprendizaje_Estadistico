@@ -1,0 +1,211 @@
+---
+title: "Análisis PCA MNIST"
+author: "Juan David Ospina Arango"
+date: "15/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## El conjunto MNIST
+
+Descripción del conjunto
+
+## Carga de la base
+Se carga una base CSV:
+
+```{r}
+mnist_train <- read.table("mnist_train.csv",sep=",",header=FALSE,colClasses = "numeric")
+```
+En mnist_train cada fila corresponde a una imagen con su respectiva etiqueta. Las etiquetas son la primera columna.Las imágenes son originalmente matrices de $28 \times 28$ que se representan en un vector fila de 784 componentes. La base de datos tiene `r dim(mnist_train)[1]` filas y `r dim(mnist_train)[2]` columnas. La primera columna del dataframe representa el dígito. A continuación se muestra el conteo de representantes de cada dígito en la base de datos:
+
+
+```{r}
+table(mnist_train$V1)
+```
+
+Ahora se separan los datos: la primera columna se llamará `train_y` y el resto del dataframe se llamará `train_X`: 
+
+
+```{r}
+train_X<-mnist_train[,-1]
+train_y<-mnist_train[,1]
+```
+
+Para ahorrar espacio en la memoria se elimina el dataframe completo:
+
+```{r}
+rm(mnist_train)
+```
+
+
+
+<!-- ```{r} -->
+<!--  library(readr) -->
+<!--  mnist_train <- read_csv("mnist_train.csv", -->
+<!--                          col_names = FALSE,col_types = cols(.default = col_integer())) -->
+<!-- ``` -->
+
+
+## Visualización de algunos dígitos
+Podemos visualizar un dígito de `train_X` seleccionando una columna y convirtiéndola en una matriz de $28 \times 28$:
+
+```{r}
+ejemplo_digito<-matrix(as.numeric(train_X[1,]),ncol=28,nrow=28,byrow = TRUE)
+print(ejemplo_digito)
+```
+
+Esta forma de visualizar no es muy eficiente. Podemos utilizar la función `image()`:
+
+```{r}
+image(1:28,1:28,ejemplo_digito)
+```
+
+
+```{r}
+par(pty="s")
+image(1:28,1:28,t(ejemplo_digito[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = paste0(c("Esto es un",train_y[1]),collapse = " "))
+grid(28,28)
+```
+
+Ahora hagamos una función para graficar cualquier número de la base de entrenamiento:
+
+```{r}
+plot_digit<-function(i,x,y){
+  digito<-matrix(as.numeric(x[i,]),ncol=28,nrow=28,byrow = TRUE)
+  par(pty="s")
+  image(1:28,1:28,t(digito[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+  title(main = paste0(c("Esto es un",y[i]),collapse = " "))
+  grid(28,28)
+}
+```
+
+Veamos cómo se utiliza la función:
+
+```{r}
+plot_digit(1,x=train_X,y=train_y)
+```
+
+Ahora veamos diferentes dígitos de la base aleatoriamente:
+
+```{r}
+set.seed(012020)
+indices<-sample(1:length(train_y),25) # Se seleccionan 25 dígitos al azar
+par(mfrow=c(3,3),pty="s")
+for (i in indices[1:9]){ # Se grafican solo 9 dígitos
+  plot_digit(i,x=train_X,y=train_y)
+}
+```
+
+Veamos los 25 dígitos como vectores y luego como imagen:
+
+```{r}
+img_vect<-as.matrix(train_X[indices,])
+image(img_vect)
+```
+Tratemos de volver la imagen anterior más informativa:
+
+```{r}
+image(1:25,1:784,img_vect,col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1,axes=FALSE)
+grid(784,25)
+axis(1, at=1:25, labels = train_y[indices],
+     las=1)
+```
+¿En qué consiste el siguiente experimento?
+
+
+```{r}
+set.seed(0120202)
+ochos<-which(train_y==8)
+unos<-which(train_y==1)
+
+muestra_ochos<-sample(ochos,20)
+muestra_unos<-sample(unos,20)
+
+indices_ochos_unos<-c(muestra_ochos,muestra_unos)
+img_vect_ochos_unos<-as.matrix(train_X[indices_ochos_unos,])
+```
+
+Veamos el resultado:
+
+```{r}
+image(1:length(indices_ochos_unos),1:784,img_vect_ochos_unos,col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1,axes=FALSE)
+grid(784,length(indices_ochos_unos))
+axis(1, at=1:length(indices_ochos_unos), labels = train_y[indices_ochos_unos],
+     las=1)
+```
+#### ¿Qué muestran las matrices de covarianza?
+
+
+```{r}
+train_X<-train_X/255
+```
+
+
+```{r}
+cov_ochos<-cov(train_X[ochos,])
+cov_unos<-cov(train_X[unos,])
+```
+
+```{r paged.print=FALSE}
+par(mfrow=c(1,2))
+image(1:784,1:784,cov_ochos,main="Covarianza de los ochos",ylab = "",xlab = "",las=1,axes=FALSE)
+image(1:784,1:784,cov_unos,main="Covarianza de los unos",ylab = "",xlab = "",las=1,axes=FALSE)
+```
+
+
+La matriz de covarianza muestra dos cosas:
+
+1. Hay pixeles que no son informativos. Estos pixeles tiene desviación estándar cero, luego no se puede calcular la correlación de otros pixeles con los pixeles no informativos
+2. La covarianza entre los pixeles cambia para estos dos dígitos
+
+### Imagen promedio
+
+Veamos el ocho promedio:
+
+```{r}
+img_ocho_promedio_vect<-apply(train_X[ochos,],2,mean)
+img_ocho_promedio<-matrix(img_ocho_promedio_vect,ncol=28,nrow=28,byrow = TRUE)
+
+img_uno_promedio_vect<-apply(train_X[unos,],2,mean)
+img_uno_promedio<-matrix(img_uno_promedio_vect,ncol=28,nrow=28,byrow = TRUE)
+
+```
+
+```{r}
+par(mfrow=c(1,2),pty="s")
+
+image(1:28,1:28,t(img_ocho_promedio[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Esto es el 8 promedio")
+grid(28,28)
+
+image(1:28,1:28,t(img_uno_promedio[28:1,]),col=gray.colors(256,rev=TRUE),main="",ylab = "",xlab = "",las=1)
+title(main = "Esto es el 1 promedio")
+grid(28,28)
+```
+
+### Imagen desviación estándar
+
+## Ejercicio de clasificación
+
+Se diseñará un clasificador para clasificar los dígitos "1" y "7".
+
+### Submuestra de entrenamiento
+
+### Comparaciones múltiples pixel a pixel
+
+### Clasificador lineal en un espacio reducido
+
+#### Reducción de la información
+
+##### Eliminación de pixeles no informativos
+
+##### Reducción a componentes principales
+
+
+#### Clasificador lineal en el espacio de las componentes principales
+
+

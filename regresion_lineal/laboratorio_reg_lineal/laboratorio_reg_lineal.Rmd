@@ -1,0 +1,184 @@
+---
+title: "Laboratorio Regresión Lineal</br>Tomado de Introduction to Statistical Learning with Applications in R (James et al., Springer, 201X)"
+author: "Prof. Juan David Ospina Arango</br>Universidad Nacional - Sede Medellín</br>Técnicas de aprendizaje estadístico</br>Semestre 2019-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Regresión simple
+
+### Precio de un inmueble en Boston
+
+El objetivo de la primera parte del laboratorio es crear un modelo para explicar el precio de una vivienda en Boston. Para ello se utilizará el conjunto `Boston` de la librería `MASS`.
+
+Primero se cargan las librerías que se usan en el laboratorio:
+
+```{r carga}
+library(MASS)
+library(ISLR)
+```
+
+Ahora se examinará la base de datos:
+
+```{r vistaBD}
+head(Boston)
+```
+
+La base tiene las siguientes variables:
+
+```{r}
+names(Boston)
+```
+
+Para ver una descripción de la base de datos se recomienda ver `help(Boston)`.
+
+#### Modelo 1: porcentaje de hogares con bajos ingresos
+
+A continuación se ajusta un primer modelo con `lstat` como variable explicativa y `medv` como variable respuesta:
+
+```{r}
+modelo1<-lm(medv~lstat,data=Boston)
+```
+
+El resultado del ajuste es el siguiente:
+
+```{r}
+summary(modelo1)
+```
+
+Ahora veamos un intervalo de confianza del 95% para los coeficientes del modelo:
+
+```{r}
+confint(modelo1)
+```
+
+Ahora se muestra el ajuste del modelo:
+
+```{r}
+with(Boston,
+  plot(lstat,medv,las=1,xlab="lstat",ylab="medv",
+       main="Precio vs Porcentaje de hogares de bajos ingresos")
+)
+abline(modelo1,col="red",lwd=2)
+grid()
+```
+
+Gráficos diagnósticos:
+
+```{r}
+par(mfrow=c(2,2))
+plot(modelo1)
+```
+
+
+Influencia:
+
+```{r}
+h_ii<-hatvalues(modelo1)
+plot(hatvalues(modelo1),las=1,xlab="i",ylab="hii",main="Influencia (h_ii)",type="h")
+```
+
+
+#### Modelo 2: porcentaje de hogares con bajos ingresos y antigüedad
+
+
+```{r}
+modelo2<-lm(medv~lstat+age,data=Boston)
+summary(modelo2)
+```
+
+
+```{r}
+par(mfrow=c(2,2))
+plot(modelo2)
+```
+
+#### Modelo 3: todas las variables disponibles en la base de datos
+
+
+```{r}
+modelo3<-lm(medv~.,data=Boston)
+summary(modelo3)
+```
+
+Inflación de la varianza:
+
+```{r}
+library(car)
+vif(modelo3)
+```
+
+De acuerdo con lo anterior, la variable `tax` pareciera poder modelarse como una combinación lineal de las otras.
+
+Ahora se muestra cómo eliminar una variable del modelo:
+
+```{r}
+modelo4<-update(modelo3,~.-age) # se elimina age
+summary(modelo4)
+```
+
+#### Modelo 5: interacciones
+
+
+```{r}
+modelo5<-lm(medv~lstat*age,data=Boston)
+summary(modelo5)
+```
+
+#### Modelo 6: términos no lineales
+
+```{r}
+modelo6<-lm(medv~lstat+I(lstat^2),data=Boston)
+summary(modelo6)
+```
+
+Para comparar el `modelo1` y el `modelo6` (que están anidados), se pueda usar la función `anova()`:
+
+```{r}
+anova(modelo1,modelo6)
+```
+
+Como el valor p es muy pequeño se rechaza la hipótesis nula de que ambos modelos tienen el mismo error en favor de que el modelo con más términos tiene un error más pequeño.
+
+```{r}
+par(mfrow=c(2,2))
+plot(modelo6)
+```
+
+#### Modelo 7: modelo polinomial
+
+```{r}
+modelo7<-lm(medv~poly(lstat,5),data=Boston)
+summary(modelo7)
+```
+
+#### Modelo 8: transformación logarítmica
+
+```{r}
+modelo8<-lm(medv~log(rm),data=Boston)
+summary(modelo8)
+```
+
+
+## Ejercicios:
+
+Suppose we have a data set with five predictors, $X_1=GPA$, $X_2=IQ$, $X_3=Gender$ (1 for Female and 0 for Male), $X_4=$Interaction between GPA and IQ, and $X_5=$Interaction between GPA and Gender. The response is starting salary after graduation (in thousands of dollars). Suppose we use least squares to fit the model, and get $\hat \beta_0=50$, $\hat \beta_1=20$, $\hat \beta_2=0.07$, $\hat \beta_3=35$, $\hat \beta_4=0.01$ and $\hat \beta_5=-10$.
+
+Podemos reescribir el modelo de la siguiente manera:
+
+$$E[Y|GPA, IQ, Gender]=\beta_0 + \beta_1 GPA + \beta_2 IQ + \beta_3 Gender + \beta_4 GPA \times IQ + \beta_5 GPA \times Gender.$$
+
+Ahora, para las mujeres este modelo toma la forma:
+
+$$\hat E[Y|GPA, IQ, Gender=1]=50 + 20 GPA + 0.07 IQ + 35 + 0.01 GPA \times IQ  -10 GPA ,$$
+
+$$\hat E[Y|GPA, IQ, Gender=1]=85 + 10 GPA + 0.07 IQ +  0.01 GPA \times IQ.$$
+
+Para los hombres toma la forma:
+
+$$\hat E[Y|GPA, IQ, Gender=0]=50 + 20 GPA + 0.07 IQ +  0.01 GPA \times IQ .$$
+
+Luego, para bajos valores del GPA las mujeres pueden ganar más que los hombres, pero para valores altos de GPA los hombres ganan más que las mujeres.

@@ -1,0 +1,54 @@
+---
+title: "Salario vs Experiencia"
+output: html_notebook
+---
+
+# Salario vs Experiencia
+
+Url del conjunto [link](https://www.kaggle.com/karthickveerakumar/salary-data-simple-linear-regression/version/1#)
+
+Carga de los datos:
+
+```{r}
+datos_salario <- read.csv("Salary_Data.csv")
+```
+
+Resumen de las variables:
+
+```{r}
+summary(datos_salario)
+```
+
+Gráfico de dispersión:
+
+```{r}
+par(mgp=c(3,0.5,0),mar=c(5,6,4,2)+0.1)
+plot(datos_salario,main="Salario vs años de experiencia",
+     xlab="Años de experiencia",
+     ylab="Salario anual [USD $]",
+     las=1)
+grid()
+
+```
+
+Ajuste de un modelo lineal:
+
+```{r}
+modelo1<-lm(Salary~YearsExperience,data=datos_salario)
+```
+
+Gráficos diagnósticos
+
+```{r}
+par(mfrow=c(3,2))
+plot(modelo1,which = 1:6)
+```
+
+Resumen del modelo:
+
+```{r}
+summary(modelo1)
+```
+
+
+
